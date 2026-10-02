@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* ---- Tour theming: components read only --t-* variables set by <ThemeScope> ---- */
+.themed {
+  background-color: var(--t-background);
+  background-image: var(--t-pattern);
+  color: var(--t-text);
+  font-family: var(--t-body-font);
+  font-size: var(--t-base-size);
+}
+.themed h1, .themed h2, .themed h3, .themed .t-heading {
+  font-family: var(--t-heading-font);
+  font-weight: var(--t-heading-weight);
+  text-transform: var(--t-heading-transform);
+  letter-spacing: var(--t-heading-tracking);
+}
+.themed a, .themed .t-link { color: var(--t-link); text-decoration: underline; text-underline-offset: 3px; }
+.themed .t-muted { color: var(--t-muted-text); }
+.themed .t-card {
+  background: var(--t-surface);
+  border: var(--t-border-width) solid var(--t-border);
+  border-radius: var(--t-radius);
+  box-shadow: var(--t-shadow);
+}
+.themed .t-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  background: var(--t-primary); color: var(--t-primary-text) !important; text-decoration: none !important;
+  border-radius: var(--t-radius); padding: .6rem 1.1rem; font-weight: 600; cursor: pointer; border: 0;
+}
+.themed .t-btn-ghost {
+  display: inline-flex; align-items: center; gap: .4rem; background: transparent; color: var(--t-text) !important;
+  border: var(--t-border-width) solid var(--t-border); border-radius: var(--t-radius); padding: .45rem .9rem; cursor: pointer; text-decoration: none !important;
+}
+.themed .t-chip { border: var(--t-border-width) solid var(--t-border); border-radius: 999px; padding: .15rem .65rem; font-size: .8em; background: var(--t-surface); }
+.themed .t-accent { color: var(--t-accent); }
+.themed .t-hero { position: relative; background-size: cover; background-position: center; }
+.themed .t-hero::before { content: ""; position: absolute; inset: 0; background: var(--t-background); opacity: var(--t-hero-overlay); }
+.themed .t-hero > * { position: relative; }
+
+.tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.7); }
+.tiles-sepia { filter: sepia(.75) saturate(.8) contrast(.95); }
+
+/* ---- Map markers (Leaflet divIcons) ---- */
+.tm-marker { display: block; width: 26px; height: 26px; background: var(--t-marker, #7a3e1d); border: 2px solid var(--t-surface, #fff); box-shadow: 0 1px 6px rgba(0,0,0,.4); color: var(--t-primary-text, #fff); font: 700 12px/22px system-ui; text-align: center; }
+.tm-marker.pin { border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
+.tm-marker.pin > span { display: block; transform: rotate(45deg); }
+.tm-marker.circle { border-radius: 50%; }
+.tm-marker.diamond { transform: rotate(45deg); border-radius: 4px; }
+.tm-marker.diamond > span { display: block; transform: rotate(-45deg); }
+.tm-marker.visited { opacity: .55; }
+.tm-marker.selected { outline: 3px solid var(--t-accent, gold); }
+.tm-user { width: 16px; height: 16px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 0 0 4px rgba(37,99,235,.3); }
+.leaflet-container { font-family: inherit; }
