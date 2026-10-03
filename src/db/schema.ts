@@ -1,3 +1,4 @@
+import type { RouteDirections } from "../lib/directions";
 import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core";
 
 export type Role = "traveler" | "operator" | "admin";
@@ -79,6 +80,8 @@ export const routes = sqliteTable("routes", {
   stopIds: text("stop_ids", { mode: "json" }).$type<string[]>().notNull().default([]),
   // Operator-drawn walking line as [lat, lng] points. Empty = straight lines between stops.
   path: text("path", { mode: "json" }).$type<[number, number][]>().notNull().default([]),
+  // Generated (and operator-editable) step-by-step walking directions; stale once `sig` no longer matches path + stop order.
+  directions: text("directions", { mode: "json" }).$type<RouteDirections | null>(),
 });
 
 export const progress = sqliteTable(

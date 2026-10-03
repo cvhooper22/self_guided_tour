@@ -27,6 +27,8 @@ export const themeTokensSchema = z.looseObject({
     link: color.default("#7a3e1d"),
     marker: color.default("#7a3e1d"),
     routeLine: color.default("#c9902b"),
+    /** Colour of the highlighted leg to the next stop. Empty = automatic (accent, or hot pink if that matches the route line). */
+    highlight: z.string().default(""),
   }).prefault({}),
   typography: z.looseObject({
     headingFont: z.string().default("Merriweather"),
@@ -64,6 +66,12 @@ export const themeTokensSchema = z.looseObject({
 
 export type ThemeTokens = z.infer<typeof themeTokensSchema>;
 export type PartialTokens = Record<string, unknown>;
+
+export function highlightColor(t: ThemeTokens): string {
+  const c = t.colors;
+  if (/^#[0-9a-f]{6}$/i.test(c.highlight)) return c.highlight;
+  return c.accent.toLowerCase() === c.routeLine.toLowerCase() ? "#ff2d6f" : c.accent;
+}
 
 export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);

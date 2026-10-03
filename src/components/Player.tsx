@@ -4,7 +4,8 @@ import Link from "next/link";
 import { ThemeScope } from "./ThemeScope";
 import { TourMap } from "./MapLazy";
 import { SourcesPanel, StopStory, TagChips } from "./StopDetail";
-import { directionsUrls, distanceM } from "@/lib/geo";
+import { directionsFresh, legPath } from "@/lib/directions";
+import { directionsUrls, distanceM, pathLengthM } from "@/lib/geo";
 import type { TourBundle } from "@/lib/tours-repo";
 
 // The player is deliberately client-only and talks to /api/tours/[slug], so it can be extracted into its own app later.
@@ -17,6 +18,8 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [routeId, setRouteId] = useState<string>("all");
+  // Stop whose "Step-by-step" section is expanded; its leg is only highlighted on the map while open.
+  const [stepsOpenFor, setStepsOpenFor] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(initialStopId ?? null);
   const [visited, setVisited] = useState<string[]>([]);
   const [geo, setGeo] = useState(false);
@@ -31,7 +34,14 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
         if (!r.ok) throw new Error(r.status === 404 ? "Tour not found" : "Could not load tour");
         const b = (await r.json()) as Bundle;
         try { localStorage.setItem(cacheKey(slug), JSON.stringify(b)); } catch {}
-        if (live) setBundle(b);
+        if (live) {
+          setBundle(b);
+          // Open on a route that covers every stop (e.g. "Full tour") so its drawn path and directions show by default.
+          const all = new Set(b.stops.map((s) => s.id));
+          const full = b.routes.filter((r) => r.stopIds.length === all.size && r.stopIds.every((id) => all.has(id)));
+          const pick = full.find((r) => directionsFresh(r)) ?? full.find((r) => r.path.length > 1);
+          if (pick) setRouteId(pick.id);
+        }
       })
       .catch((e: Error) => {
         // Spotty signal outdoors: fall back to the last copy we saw.
@@ -108,13 +118,16 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
   if (!bundle) return <div className="p-8 text-center">Loading tour…</div>;
 
   const label = String(bundle.tokens.copy.stopLabel);
+  // The walk from the open stop to the next one; drawn on top of the route while its step-by-step section is open.
+  const stopIdx = stop ? stops.indexOf(stop) : -1;
+  const leg = stopIdx >= 0 ? legPath(route?.path ?? [], stops.map((s) => [s.lat, s.lng] as [number, number]), stopIdx) : [];
   const mapStops = stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: s.title, visited: visited.includes(s.id), icon: s.markerIcon, color: s.markerColor }));
   const center: [number, number] = stops[0] ? [stops[0].lat, stops[0].lng] : [bundle.tour.lat, bundle.tour.lng];
 
   return (
     <ThemeScope tokens={bundle.tokens} className="flex h-[calc(100dvh-3rem)] flex-col md:flex-row">
       <div className="relative h-1/2 md:h-full md:flex-1">
-        <TourMap tokens={bundle.tokens} center={center} stops={mapStops} selectedId={selected} routeIds={stops.map((s) => s.id)} path={route?.path} user={pos} onSelect={(id) => setSelected(id)} fitKey={`${bundle.tour.id}:${routeId}`} />
+        <TourMap tokens={bundle.tokens} center={center} stops={mapStops} selectedId={selected} routeIds={stops.map((s) => s.id)} path={route?.path} highlight={stop && stepsOpenFor === stop.id ? leg : undefined} user={pos} onSelect={(id) => setSelected(id)} fitKey={`${bundle.tour.id}:${routeId}`} />
         <button className="t-btn absolute right-3 top-3 z-[1000]" aria-pressed={geo} onClick={toggleGeo}>
           {geo ? "📍 Location on" : "📍 Use my location"}
         </button>
@@ -158,6 +171,22 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
             <TagChips tags={stop.tags} />
             <StopStory story={stop.story} />
             <SourcesPanel sources={stop.sources} />
+            {route && directionsFresh(route) && stops[stopIdx + 1] && (() => {
+              const next = stops[stopIdx + 1];
+              const steps = route.directions!.steps.filter((s) => s.leg === stopIdx);
+              const fmt = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`);
+              return (
+                <details className="t-card mt-5 p-3" open={stepsOpenFor === stop.id} onToggle={(e) => { const open = e.currentTarget.open; setStepsOpenFor((cur) => (open ? stop.id : cur === stop.id ? null : cur)); }}>
+                  <summary className="cursor-pointer font-semibold">Step-by-step to {next.title}</summary>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
+                    {steps.length > 0
+                      ? steps.map((s, i) => <li key={i}>{s.text}{s.distanceM > 0 && <span className="t-muted"> ({fmt(s.distanceM)})</span>}</li>)
+                      // Short legs often have no steps of their own; the highlighted line on the map shows the way.
+                      : <li>Continue to {next.title}<span className="t-muted"> (about {fmt(Math.max(10, Math.round(pathLengthM(leg) / 10) * 10))})</span></li>}
+                  </ol>
+                </details>
+              );
+            })()}
             <p className="t-muted mt-5 text-sm">
               Walking directions:{" "}
               <a href={directionsUrls(stop).google} target="_blank" rel="noopener noreferrer">Google Maps</a>

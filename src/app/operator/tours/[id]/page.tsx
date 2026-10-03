@@ -19,7 +19,7 @@ export default async function EditTour({ params }: PageProps<"/operator/tours/[i
   const doc: TourDoc = {
     tour: { title: t.title, slug: t.slug, summary: t.summary, story: t.story, coverUrl: t.coverUrl, city: t.city, lat: t.lat, lng: t.lng, tags: t.tags, isFree: t.isFree, themeId: t.themeId, themeOverrides: t.themeOverrides },
     stops: b.stops.map((x) => ({ id: x.id, title: x.title, lat: x.lat, lng: x.lng, radiusM: x.radiusM, story: x.story, tags: x.tags, markerIcon: x.markerIcon, markerColor: x.markerColor, sources: x.sources.map(({ id, kind, title, url, description }) => ({ id, kind, title, url, description })) })),
-    routes: b.routes.map((r) => ({ id: r.id, name: r.name, description: r.description, stopIds: r.stopIds, path: r.path })),
+    routes: b.routes.map((r) => ({ id: r.id, name: r.name, description: r.description, stopIds: r.stopIds, path: r.path, directions: r.directions ?? null })),
   };
   const themes = await listThemesFor(s.uid, !!realAdminId(s));
   const markerImages = await listMarkerImages();

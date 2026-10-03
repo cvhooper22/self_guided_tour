@@ -4,7 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { nearestSegmentIndex } from "@/lib/geo";
 import { parseMarker } from "@/lib/markers";
-import { tileConfig, type ThemeTokens } from "@/lib/themes";
+import { highlightColor, tileConfig, type ThemeTokens } from "@/lib/themes";
 
 export type MapStop = { id: string; lat: number; lng: number; label: string; visited?: boolean; icon?: string; color?: string };
 
@@ -21,6 +21,8 @@ type Props = {
   /** Path-editing: click a vertex to select it; selected indexes are highlighted and the span between two is emphasised. */
   onVertexClick?: (index: number) => void;
   selection?: number[];
+  /** A stretch of route to emphasise (e.g. the walk from the open stop to the next one). */
+  highlight?: [number, number][];
   user?: { lat: number; lng: number } | null;
   onSelect?: (id: string) => void;
   onMapClick?: (lat: number, lng: number) => void;
@@ -75,6 +77,11 @@ export default function TourMap(p: Props) {
         cb.current.onPathChange(next);
       });
     }
+    if (p.highlight && p.highlight.length > 1) {
+      // A pale casing under a bright core keeps the leg readable on any tile style and next to the base route line.
+      L.polyline(p.highlight, { color: "#ffffff", weight: 12, opacity: 0.9, lineCap: "round", interactive: false }).addTo(g);
+      L.polyline(p.highlight, { color: highlightColor(p.tokens), weight: 7, opacity: 1, lineCap: "round", interactive: false }).addTo(g);
+    }
     const sel = p.selection ?? [];
     if (p.path && sel.length === 2 && drawn) {
       const [a, b] = [Math.min(...sel), Math.max(...sel)];
@@ -111,7 +118,7 @@ export default function TourMap(p: Props) {
     });
     if (p.user) L.marker([p.user.lat, p.user.lng], { icon: L.divIcon({ className: "", html: '<div class="tm-user"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }), interactive: false }).addTo(g);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.stops, p.selectedId, p.user, p.path, (p.selection ?? []).join(","), shape, defaultIcon, routeKey, p.tokens.colors.routeLine, p.tokens.map.routeLineStyle]);
+  }, [p.stops, p.selectedId, p.user, p.path, (p.highlight ?? []).join(";"), (p.selection ?? []).join(","), shape, defaultIcon, routeKey, p.tokens.colors.routeLine, p.tokens.colors.accent, p.tokens.colors.highlight, p.tokens.map.routeLineStyle]);
 
   // Re-fit only when the caller changes fitKey (e.g. route switch), so dragging doesn't jump the view.
   useEffect(() => {

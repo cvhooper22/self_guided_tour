@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import PathEditor from "./PathEditor";
 import { resolveTokens } from "@/lib/themes";
+import { routeSig } from "@/lib/directions";
 import { currentLengthM, orderStops } from "@/lib/route-order";
 import type { TourDoc } from "@/lib/tours-repo";
 import { input } from "./styles";
@@ -65,7 +66,9 @@ export default function RoutesTab({ doc, setDoc, themes }: Props) {
                 center={[doc.stops[0]?.lat ?? doc.tour.lat, doc.stops[0]?.lng ?? doc.tour.lng]}
                 stops={routeStops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: s.title, icon: s.markerIcon, color: s.markerColor }))}
                 routeIds={r.stopIds} stopPoints={routeStops.map((s) => [s.lat, s.lng] as [number, number])}
+                stopTitles={routeStops.map((s) => s.title)}
                 path={r.path} onChange={(path) => upd(r.id, { path })}
+                sig={routeSig(r.path, r.stopIds)} directions={r.directions} onDirections={(directions) => upd(r.id, { directions })}
               />
             );
           })()}
@@ -75,7 +78,7 @@ export default function RoutesTab({ doc, setDoc, themes }: Props) {
           </select>
         </div>
       ))}
-      <button className="rounded border px-3 py-1.5" onClick={() => setDoc((d) => ({ ...d, routes: [...d.routes, { id: crypto.randomUUID(), name: `Route ${d.routes.length + 1}`, description: "", stopIds: d.stops.map((s) => s.id), path: [] }] }))}>+ Add route</button>
+      <button className="rounded border px-3 py-1.5" onClick={() => setDoc((d) => ({ ...d, routes: [...d.routes, { id: crypto.randomUUID(), name: `Route ${d.routes.length + 1}`, description: "", stopIds: d.stops.map((s) => s.id), path: [], directions: null }] }))}>+ Add route</button>
     </div>
   );
 }

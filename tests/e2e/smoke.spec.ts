@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { routeSig } from "../../src/lib/directions";
 
 async function signIn(page: Page, who: "traveler" | "operator" | "admin") {
   await page.goto("/login");
@@ -198,9 +199,9 @@ test("operator draws a walking path on a route and travelers get directions link
   await expect(page.getByRole("status")).toHaveText("Saved");
   const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
   expect(b.routes[0].path).toHaveLength(3);
-  // Snapping needs a routing key; without one the server says so instead of failing.
-  const snap = await page.request.post("/api/operator/route-snap", { data: { points: b.routes[0].path } });
-  expect([200, 501]).toContain(snap.status());
+  // The snap endpoint validates its input before calling the routing service (so this never spends quota).
+  const snap = await page.request.post("/api/operator/route-snap", { data: { points: [b.routes[0].path[0]] } });
+  expect(snap.status()).toBe(400);
   // Out-of-range points are rejected server-side.
   b.routes[0].path = [[999, 0]];
   expect((await page.request.put(`/api/operator/tours/${id}`, { data: { tour: b.tour, stops: b.stops, routes: b.routes } })).ok()).toBe(false);
@@ -212,4 +213,27 @@ test("player shows walking directions links for a stop", async ({ page }) => {
   await page.getByRole("button", { name: /^Next:/ }).click();
   await expect(page.getByRole("link", { name: "Google Maps" })).toHaveAttribute("href", /travelmode=walking/);
   await expect(page.getByRole("link", { name: "Apple Maps" })).toHaveAttribute("href", /dirflg=w/);
+});
+
+test("player shows saved step-by-step directions only while they are up to date", async ({ page }) => {
+  await signIn(page, "operator");
+  const { id, slug } = await (await page.request.post("/api/operator/tours", { data: { title: `E2E ${Date.now()}` } })).json();
+  const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
+  const stops = [0, 1].map((i) => ({ id: crypto.randomUUID(), title: `Stop ${i + 1}`, lat: 32.07 + i * 0.002, lng: -81.09, radiusM: 40, story: "", tags: [], markerIcon: "", markerColor: "", sources: [] }));
+  const path: [number, number][] = [[32.07, -81.09], [32.071, -81.09], [32.072, -81.09]];
+  const stopIds = stops.map((x) => x.id);
+  const route = { id: crypto.randomUUID(), name: "Walk", description: "", stopIds, path, directions: { sig: routeSig(path, stopIds), steps: [{ text: "Head north on Bull Street", distanceM: 222, at: path[0], leg: 0 }, { text: "Arrive at your destination", distanceM: 0, at: path[2], leg: 0 }] } };
+  const put = (r: object) => page.request.put(`/api/operator/tours/${id}`, { data: { tour: b.tour, stops, routes: [r] } });
+  expect((await put(route)).ok()).toBe(true);
+  await page.goto(`/play/${slug}`);
+  await page.getByRole("combobox").selectOption({ label: "Walk" });
+  await page.getByRole("button", { name: /Stop 1/ }).first().click();
+  await page.getByText("Step-by-step to Stop 2").click();
+  await expect(page.getByText("Head north on Bull Street")).toBeVisible();
+  // Changing the path makes the saved directions stale, so travelers stop seeing them.
+  expect((await put({ ...route, path: [...path, [32.073, -81.09]] })).ok()).toBe(true);
+  await page.goto(`/play/${slug}`);
+  await page.getByRole("combobox").selectOption({ label: "Walk" });
+  await page.getByRole("button", { name: /Stop 1/ }).first().click();
+  await expect(page.getByText("Step-by-step to Stop 2")).toHaveCount(0);
 });

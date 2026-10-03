@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db/client";
+import { directionsSchema } from "./directions";
 import { markerColorSchema, markerIconSchema } from "./markers";
 import { resolveTokens, type ThemeTokens } from "./themes";
 
@@ -157,7 +158,7 @@ export const tourDocSchema = z.object({
     markerColor: markerColorSchema,
     sources: z.array(sourceDoc),
   })),
-  routes: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), description: z.string(), stopIds: z.array(z.string()), path: pathSchema })),
+  routes: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), description: z.string(), stopIds: z.array(z.string()), path: pathSchema, directions: directionsSchema })),
 });
 export type TourDoc = z.infer<typeof tourDocSchema>;
 

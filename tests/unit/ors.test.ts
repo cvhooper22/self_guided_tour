@@ -20,7 +20,7 @@ describe("snapToStreets", () => {
     await expect(snapToStreets([a, b], { apiKey: "" })).rejects.toMatchObject({ status: 501 });
   });
   it("keeps the original endpoints and converts lng/lat", async () => {
-    const out = await snapToStreets([a, b], { apiKey: "k", fetchImpl: ok([[-81.0001, 32.0002], [-81.0001, 32.005], [-81.0002, 32.0098]]) });
+    const { path: out } = await snapToStreets([a, b], { apiKey: "k", fetchImpl: ok([[-81.0001, 32.0002], [-81.0001, 32.005], [-81.0002, 32.0098]]) });
     expect(out[0]).toEqual(a);
     expect(out.at(-1)).toEqual(b);
     expect(out.length).toBeGreaterThanOrEqual(3);
@@ -38,5 +38,35 @@ describe("simplifyTo", () => {
     expect(out.length).toBeLessThanOrEqual(100);
     expect(out[0]).toEqual(dense[0]);
     expect(out.at(-1)).toEqual(dense.at(-1));
+  });
+});
+
+describe("directions steps", () => {
+  const coords: [number, number][] = [[-81, 32], [-81, 32.001], [-80.999, 32.001], [-80.999, 32.002]];
+  const step = (instruction: string, type: number, name: string, distance: number, wp: [number, number]) => ({ instruction, type, name, distance, way_points: wp });
+  const body = (segments: unknown[]) => (async () => new Response(JSON.stringify({ features: [{ geometry: { coordinates: coords }, properties: { segments } }] }))) as unknown as typeof fetch;
+  const a: LatLngTuple = [32, -81], b: LatLngTuple = [32.002, -80.999];
+
+  it("returns text steps, dropping interior arrive/depart noise", async () => {
+    const segments = [
+      { steps: [step("Head north on Bull Street", 11, "Bull Street", 111, [0, 1]), step("Arrive at your via point", 10, "-", 0, [1, 1])] },
+      { steps: [step("Head north on Bull Street", 11, "Bull Street", 50, [1, 1]), step("Turn right onto Taylor Street", 1, "Taylor Street", 90, [1, 2]), step("Arrive at your destination", 10, "-", 0, [3, 3])] },
+    ];
+    const { steps } = await snapToStreets([a, b], { apiKey: "k", steps: true, fetchImpl: body(segments) });
+    expect(steps.map((s) => s.text)).toEqual(["Head north on Bull Street", "Turn right onto Taylor Street", "Arrive at your destination"]);
+    expect(steps[0].distanceM).toBe(161); // via-point depart merged into the previous step
+    expect(steps[1].at).toEqual([32.001, -81]);
+  });
+  it("says 'Continue onto' when a via point starts on a different street", async () => {
+    const segments = [
+      { steps: [step("Head north on Bull Street", 11, "Bull Street", 111, [0, 1])] },
+      { steps: [step("Head east on Taylor Street", 11, "Taylor Street", 80, [1, 2]), step("Arrive at your destination", 10, "-", 0, [3, 3])] },
+    ];
+    const { steps } = await snapToStreets([a, b], { apiKey: "k", steps: true, fetchImpl: body(segments) });
+    expect(steps.map((s) => s.text)).toEqual(["Head north on Bull Street", "Continue onto Taylor Street", "Arrive at your destination"]);
+  });
+  it("omits steps unless asked", async () => {
+    const { steps } = await snapToStreets([a, b], { apiKey: "k", fetchImpl: body([]) });
+    expect(steps).toEqual([]);
   });
 });

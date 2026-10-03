@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { TourMap } from "../MapLazy";
 import type { MapStop } from "../TourMap";
-import { pathLengthM, type LatLngTuple } from "@/lib/geo";
+import { assignLegs, type RouteDirections } from "@/lib/directions";
+import { pathLengthM, simplifyTo, type LatLngTuple } from "@/lib/geo";
 import type { ThemeTokens } from "@/lib/themes";
 
 const MAX_POINTS = 500;
@@ -16,8 +17,14 @@ type Props = {
   routeIds: string[];
   /** Stop coordinates in route order, used to seed or snap an empty path. */
   stopPoints: LatLngTuple[];
+  /** Stop names in route order, for labelling the directions. */
+  stopTitles: string[];
   path: LatLngTuple[];
   onChange: (path: LatLngTuple[]) => void;
+  /** Fingerprint of the current path + stop order; directions are only valid while theirs matches. */
+  sig: string;
+  directions: RouteDirections | null;
+  onDirections: (d: RouteDirections | null) => void;
   fitKey: string;
 };
 
@@ -25,7 +32,7 @@ type Props = {
  * Edit a route's walking line. Select one vertex (or two to select the span between them),
  * then redraw, straighten, cut or snap that part, with undo/redo for everything.
  */
-export default function PathEditor({ tokens, center, stops, routeIds, stopPoints, path, onChange, fitKey }: Props) {
+export default function PathEditor({ tokens, center, stops, routeIds, stopPoints, stopTitles, path, onChange, sig, directions, onDirections, fitKey }: Props) {
   const [sel, setSel] = useState<number[]>([]);
   // Where the next map click inserts a point; null = not drawing.
   const [at, setAt] = useState<number | null>(null);
@@ -90,6 +97,24 @@ export default function PathEditor({ tokens, center, stops, routeIds, stopPoints
   };
   const target = snapTarget();
 
+  async function generateDirections() {
+    const base = path.length > 1 ? path : stopPoints;
+    if (base.length < 2) return;
+    setBusy(true); setMsg("");
+    try {
+      // The routing service takes at most ~200 waypoints; thinning keeps the walk on the same streets.
+      const res = await fetch("/api/operator/route-snap", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ points: simplifyTo(base, 100, 3), maxPoints: 2, steps: true }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return setMsg(body.error ?? "Could not get directions");
+      onDirections({ sig, steps: assignLegs(body.steps ?? [], base, stopPoints) });
+      setMsg("Directions generated.");
+    } catch {
+      setMsg("Could not reach the routing service.");
+    } finally { setBusy(false); }
+  }
+  const fresh = !!directions && directions.sig === sig;
+  const legs = directions ? [...new Set(directions.steps.map((s) => s.leg))].sort((x, y) => x - y) : [];
+
   const status = at !== null
     ? `Drawing: click the map to add points${at < path.length ? ` (they go in after point ${at}, before point ${at + 1})` : " at the end of the route"}.`
     : hasSpan ? `Points ${a + 1} → ${b + 1} selected (${b - a - 1} in between).`
@@ -142,6 +167,24 @@ export default function PathEditor({ tokens, center, stops, routeIds, stopPoints
           fitKey={fitKey}
         />
       </div>
+      <section className="grid gap-2 rounded border p-3 text-sm" aria-label="Walking directions">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="font-semibold">Step-by-step directions</h4>
+          {directions && <span className={`rounded px-2 py-0.5 text-xs ${fresh ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900"}`}>{fresh ? "Up to date" : "Out of date: path or stop order changed"}</span>}
+          <button className={btn} disabled={busy || (path.length < 2 && stopPoints.length < 2)} onClick={generateDirections}>{busy ? "Working…" : directions ? "Regenerate directions" : "Generate directions"}</button>
+          {directions && <button className={btn} onClick={() => onDirections(null)}>Remove</button>}
+        </div>
+        {!directions && <p className="text-neutral-500">Creates text turn-by-turn steps for travelers, following the streets between your stops. Travelers only see them while they&apos;re up to date.</p>}
+        {directions && !fresh && <p className="text-neutral-500">Travelers don&apos;t see these until you regenerate them.</p>}
+        {legs.map((k) => (
+          <div key={k}>
+            <p className="font-medium">{stopTitles[k] ?? `Stop ${k + 1}`} → {stopTitles[k + 1] ?? `Stop ${k + 2}`}</p>
+            <ol className="ml-5 list-decimal text-neutral-600 dark:text-neutral-300">
+              {directions!.steps.filter((s) => s.leg === k).map((s, i) => <li key={i}>{s.text}{s.distanceM > 0 ? ` (${s.distanceM} m)` : ""}</li>)}
+            </ol>
+          </div>
+        ))}
+      </section>
       <p className="text-xs text-neutral-500">{path.length} points{path.length > 1 ? `, about ${Math.round(pathLengthM(path))} m` : ""}. Drag points to move them; click the line to add a point in the middle. Green is the start, red is the end.</p>
     </div>
   );
