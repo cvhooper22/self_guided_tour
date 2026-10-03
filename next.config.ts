@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The operator editor lists public/markers/ at runtime; make sure those files ship with the function.
+  outputFileTracingIncludes: { "/operator/tours/[id]": ["./public/markers/**/*"] },
 };
 
 export default nextConfig;

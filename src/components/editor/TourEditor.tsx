@@ -6,13 +6,14 @@ import type { TourDoc } from "@/lib/tours-repo";
 import { slugify } from "@/lib/slug";
 import StopsTab from "./StopsTab";
 import RoutesTab from "./RoutesTab";
+import TagsField from "./TagsField";
 import ThemeTab, { type ThemeRow } from "./ThemeTab";
 
 type Tab = "details" | "stops" | "routes" | "theme" | "publish";
 const TABS: [Tab, string][] = [["details", "Details"], ["stops", "Stops & sources"], ["routes", "Routes"], ["theme", "Theme"], ["publish", "Publish"]];
 import { input } from "./styles";
 
-type Props = { tourId: string; initialDoc: TourDoc; status: "draft" | "published"; deleted: boolean; themes: ThemeRow[]; meId: string; isAdmin: boolean };
+type Props = { tourId: string; initialDoc: TourDoc; status: "draft" | "published"; deleted: boolean; themes: ThemeRow[]; markerImages: string[]; meId: string; isAdmin: boolean };
 
 export default function TourEditor(p: Props) {
   const r = useRouter();
@@ -76,12 +77,13 @@ export default function TourEditor(p: Props) {
             <label>Longitude<input type="number" step="any" className={input} value={t.lng} onChange={(e) => setTour({ lng: Number(e.target.value) })} /></label>
           </div>
           <label>Cover image URL<input className={input} value={t.coverUrl ?? ""} placeholder="https://… (uploads coming soon)" onChange={(e) => setTour({ coverUrl: e.target.value || null })} /></label>
+          <TagsField tags={t.tags} onChange={(tags) => setTour({ tags })} />
           <label className="flex items-center gap-2"><input type="checkbox" checked={t.isFree} onChange={(e) => setTour({ isFree: e.target.checked })} /> Free tour</label>
         </div>
       )}
-      {tab === "stops" && <StopsTab doc={doc} setDoc={setDoc} themes={themes} />}
-      {tab === "routes" && <RoutesTab doc={doc} setDoc={setDoc} />}
-      {tab === "theme" && <ThemeTab doc={doc} setDoc={setDoc} themes={themes} setThemes={setThemes} meId={p.meId} isAdmin={p.isAdmin} />}
+      {tab === "stops" && <StopsTab markerImages={p.markerImages} doc={doc} setDoc={setDoc} themes={themes} />}
+      {tab === "routes" && <RoutesTab doc={doc} setDoc={setDoc} themes={themes} />}
+      {tab === "theme" && <ThemeTab markerImages={p.markerImages} doc={doc} setDoc={setDoc} themes={themes} setThemes={setThemes} meId={p.meId} isAdmin={p.isAdmin} />}
       {tab === "publish" && (
         <div className="max-w-xl space-y-4">
           <p>Status: <b>{status}</b>. Published tours appear in the marketplace and are readable by anyone with the link.</p>

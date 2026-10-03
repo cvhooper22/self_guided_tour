@@ -5,13 +5,14 @@ import { TourMap } from "../MapLazy";
 import { TOKEN_OPTIONS, TOKEN_SUGGESTIONS, deepMerge, isPlainObject, resolveTokens, setPath, themeTokensSchema, type PartialTokens } from "@/lib/themes";
 import type { TourDoc } from "@/lib/tours-repo";
 import { input } from "./styles";
+import MarkerPicker from "./MarkerPicker";
 
 export type ThemeRow = { id: string; name: string; isPreset: boolean; ownerId: string | null; tokens: PartialTokens };
-type Props = { doc: TourDoc; setDoc: (fn: (d: TourDoc) => TourDoc) => void; themes: ThemeRow[]; setThemes: (t: ThemeRow[]) => void; meId: string; isAdmin: boolean };
+type Props = { doc: TourDoc; setDoc: (fn: (d: TourDoc) => TourDoc) => void; themes: ThemeRow[]; setThemes: (t: ThemeRow[]) => void; meId: string; isAdmin: boolean; markerImages: string[] };
 
 const label = (k: string) => k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
-export default function ThemeTab({ doc, setDoc, themes, setThemes, meId, isAdmin }: Props) {
+export default function ThemeTab({ doc, setDoc, themes, setThemes, meId, isAdmin, markerImages }: Props) {
   const [msg, setMsg] = useState("");
   const [raw, setRaw] = useState<string | null>(null);
   const base = themes.find((t) => t.id === doc.tour.themeId);
@@ -46,7 +47,8 @@ export default function ThemeTab({ doc, setDoc, themes, setThemes, meId, isAdmin
     const path = `${group}.${key}`, id = `tok-${path}`;
     const common = { id, "aria-label": label(key) };
     let control;
-    if (TOKEN_OPTIONS[path]) control = <select {...common} className={input} value={String(value)} onChange={(e) => setToken([group, key], e.target.value)}>{TOKEN_OPTIONS[path].map((o) => <option key={o}>{o}</option>)}</select>;
+    if (path === "map.markerIcon") control = <MarkerPicker value={String(value ?? "")} onChange={(v) => setToken([group, key], v)} images={markerImages} emptyLabel="Numbered" />;
+    else if (TOKEN_OPTIONS[path]) control = <select {...common} className={input} value={String(value)} onChange={(e) => setToken([group, key], e.target.value)}>{TOKEN_OPTIONS[path].map((o) => <option key={o}>{o}</option>)}</select>;
     else if (group === "colors") control = <div className="flex gap-2"><input {...common} type="color" className="h-10 w-12" value={/^#[0-9a-f]{6}$/i.test(String(value)) ? String(value) : "#000000"} onChange={(e) => setToken([group, key], e.target.value)} /><input className={input} aria-label={`${label(key)} hex`} value={String(value)} onChange={(e) => setToken([group, key], e.target.value)} /></div>;
     else if (typeof value === "number") control = <input {...common} type="number" step="any" className={input} value={value} onChange={(e) => setToken([group, key], Number(e.target.value))} />;
     else if (typeof value === "boolean") control = <input {...common} type="checkbox" checked={value} onChange={(e) => setToken([group, key], e.target.checked)} />;
@@ -103,7 +105,7 @@ export default function ThemeTab({ doc, setDoc, themes, setThemes, meId, isAdmin
           </div>
           <div className="grid gap-4 p-4 md:grid-cols-2">
             <div className="h-56 overflow-hidden" style={{ borderRadius: "var(--t-radius)" }}>
-              <TourMap tokens={tokens} center={[doc.stops[0]?.lat ?? doc.tour.lat, doc.stops[0]?.lng ?? doc.tour.lng]} stops={doc.stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: s.title }))} routeIds={doc.stops.map((s) => s.id)} fitKey="preview" />
+              <TourMap tokens={tokens} center={[doc.stops[0]?.lat ?? doc.tour.lat, doc.stops[0]?.lng ?? doc.tour.lng]} stops={doc.stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: s.title, icon: s.markerIcon, color: s.markerColor }))} routeIds={doc.stops.map((s) => s.id)} fitKey="preview" />
             </div>
             <div className="t-card p-4">
               <p className="t-muted text-sm">{tokens.copy.stopLabel} 1</p>

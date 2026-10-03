@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ThemeScope } from "./ThemeScope";
 import { TourMap } from "./MapLazy";
-import { SourcesPanel, StopStory } from "./StopDetail";
-import { distanceM } from "@/lib/geo";
+import { SourcesPanel, StopStory, TagChips } from "./StopDetail";
+import { directionsUrls, distanceM } from "@/lib/geo";
 import type { TourBundle } from "@/lib/tours-repo";
 
 // The player is deliberately client-only and talks to /api/tours/[slug], so it can be extracted into its own app later.
@@ -108,13 +108,13 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
   if (!bundle) return <div className="p-8 text-center">Loading tour…</div>;
 
   const label = String(bundle.tokens.copy.stopLabel);
-  const mapStops = stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: s.title, visited: visited.includes(s.id) }));
+  const mapStops = stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: s.title, visited: visited.includes(s.id), icon: s.markerIcon, color: s.markerColor }));
   const center: [number, number] = stops[0] ? [stops[0].lat, stops[0].lng] : [bundle.tour.lat, bundle.tour.lng];
 
   return (
     <ThemeScope tokens={bundle.tokens} className="flex h-[calc(100dvh-3rem)] flex-col md:flex-row">
       <div className="relative h-1/2 md:h-full md:flex-1">
-        <TourMap tokens={bundle.tokens} center={center} stops={mapStops} selectedId={selected} routeIds={stops.map((s) => s.id)} user={pos} onSelect={(id) => setSelected(id)} fitKey={`${bundle.tour.id}:${routeId}`} />
+        <TourMap tokens={bundle.tokens} center={center} stops={mapStops} selectedId={selected} routeIds={stops.map((s) => s.id)} path={route?.path} user={pos} onSelect={(id) => setSelected(id)} fitKey={`${bundle.tour.id}:${routeId}`} />
         <button className="t-btn absolute right-3 top-3 z-[1000]" aria-pressed={geo} onClick={toggleGeo}>
           {geo ? "📍 Location on" : "📍 Use my location"}
         </button>
@@ -155,9 +155,16 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
             <button className="t-btn-ghost mb-3" onClick={() => setSelected(null)}>← All {label.toLowerCase()}s</button>
             <p className="t-muted text-sm">{label} {stops.indexOf(stop) + 1} of {stops.length}</p>
             <h2 className="mb-3 text-2xl">{stop.title}</h2>
+            <TagChips tags={stop.tags} />
             <StopStory story={stop.story} />
             <SourcesPanel sources={stop.sources} />
-            <div className="mt-5 flex gap-2">
+            <p className="t-muted mt-5 text-sm">
+              Walking directions:{" "}
+              <a href={directionsUrls(stop).google} target="_blank" rel="noopener noreferrer">Google Maps</a>
+              {" · "}
+              <a href={directionsUrls(stop).apple} target="_blank" rel="noopener noreferrer">Apple Maps</a>
+            </p>
+            <div className="mt-3 flex gap-2">
               <button className="t-btn-ghost" onClick={() => markVisited(stop.id)} disabled={visited.includes(stop.id)}>{visited.includes(stop.id) ? "✓ Visited" : "Mark visited"}</button>
               {stops[stops.indexOf(stop) + 1] && <button className="t-btn" onClick={() => { markVisited(stop.id); setSelected(stops[stops.indexOf(stop) + 1].id); }}>Next {label.toLowerCase()} →</button>}
             </div>
