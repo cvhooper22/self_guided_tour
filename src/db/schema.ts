@@ -1,3 +1,4 @@
+import type { RouteDirections } from "../lib/directions";
 import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core";
 
 export type Role = "traveler" | "operator" | "admin";
@@ -38,6 +39,8 @@ export const tours = sqliteTable("tours", {
   lat: real("lat").notNull().default(0),
   lng: real("lng").notNull().default(0),
   status: text("status").$type<TourStatus>().notNull().default("draft"),
+  // Operator-defined free-form labels (e.g. "Local favorite"), shown to travelers and filterable.
+  tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
   isFree: integer("is_free", { mode: "boolean" }).notNull().default(true),
   themeId: text("theme_id").references(() => themes.id),
   themeOverrides: text("theme_overrides", { mode: "json" }).$type<Record<string, unknown>>().notNull().default({}),
@@ -53,7 +56,11 @@ export const stops = sqliteTable("stops", {
   lat: real("lat").notNull(),
   lng: real("lng").notNull(),
   radiusM: integer("radius_m").notNull().default(40),
+  tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
   story: text("story").notNull().default(""),
+  // "" = inherit the tour default; see lib/markers.ts for the accepted formats.
+  markerIcon: text("marker_icon").notNull().default(""),
+  markerColor: text("marker_color").notNull().default(""),
 });
 
 export const stopSources = sqliteTable("stop_sources", {
@@ -71,6 +78,10 @@ export const routes = sqliteTable("routes", {
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
   stopIds: text("stop_ids", { mode: "json" }).$type<string[]>().notNull().default([]),
+  // Operator-drawn walking line as [lat, lng] points. Empty = straight lines between stops.
+  path: text("path", { mode: "json" }).$type<[number, number][]>().notNull().default([]),
+  // Generated (and operator-editable) step-by-step walking directions; stale once `sig` no longer matches path + stop order.
+  directions: text("directions", { mode: "json" }).$type<RouteDirections | null>(),
 });
 
 export const progress = sqliteTable(

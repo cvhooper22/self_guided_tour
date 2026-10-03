@@ -4,12 +4,14 @@ import { TourMap } from "../MapLazy";
 import { resolveTokens } from "@/lib/themes";
 import type { TourDoc } from "@/lib/tours-repo";
 import { input } from "./styles";
+import MarkerPicker from "./MarkerPicker";
+import TagsField from "./TagsField";
 import type { ThemeRow } from "./ThemeTab";
 
-type Props = { doc: TourDoc; setDoc: (fn: (d: TourDoc) => TourDoc) => void; themes: ThemeRow[] };
+type Props = { doc: TourDoc; setDoc: (fn: (d: TourDoc) => TourDoc) => void; themes: ThemeRow[]; markerImages: string[] };
 const KINDS = ["link", "image", "document", "audio", "video"] as const;
 
-export default function StopsTab({ doc, setDoc, themes }: Props) {
+export default function StopsTab({ doc, setDoc, themes, markerImages }: Props) {
   const [sel, setSel] = useState<string | null>(doc.stops[0]?.id ?? null);
   const [placing, setPlacing] = useState(false);
   const tokens = useMemo(() => resolveTokens(themes.find((t) => t.id === doc.tour.themeId)?.tokens, doc.tour.themeOverrides), [themes, doc.tour]);
@@ -18,7 +20,7 @@ export default function StopsTab({ doc, setDoc, themes }: Props) {
 
   function addAt(lat: number, lng: number) {
     const id = crypto.randomUUID();
-    setDoc((d) => ({ ...d, stops: [...d.stops, { id, title: `Stop ${d.stops.length + 1}`, lat, lng, radiusM: 40, story: "", sources: [] }] }));
+    setDoc((d) => ({ ...d, stops: [...d.stops, { id, title: `Stop ${d.stops.length + 1}`, lat, lng, radiusM: 40, story: "", tags: [], markerIcon: "", markerColor: "", sources: [] }] }));
     setSel(id); setPlacing(false);
   }
   function move(i: number, dir: -1 | 1) {
@@ -38,7 +40,7 @@ export default function StopsTab({ doc, setDoc, themes }: Props) {
           <span className="text-neutral-500">Drag a marker to move it.</span>
         </div>
         <div className={`h-[28rem] overflow-hidden rounded border ${placing ? "cursor-crosshair" : ""}`}>
-          <TourMap tokens={tokens} center={[doc.stops[0]?.lat ?? doc.tour.lat, doc.stops[0]?.lng ?? doc.tour.lng]} stops={doc.stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: s.title }))} selectedId={sel} routeIds={doc.stops.map((s) => s.id)} onSelect={setSel} onMapClick={placing ? addAt : undefined} onMarkerDrag={(id, lat, lng) => patch(id, { lat: +lat.toFixed(6), lng: +lng.toFixed(6) })} fitKey="stops" />
+          <TourMap tokens={tokens} center={[doc.stops[0]?.lat ?? doc.tour.lat, doc.stops[0]?.lng ?? doc.tour.lng]} stops={doc.stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: s.title, icon: s.markerIcon, color: s.markerColor }))} selectedId={sel} routeIds={doc.stops.map((s) => s.id)} onSelect={setSel} onMapClick={placing ? addAt : undefined} onMarkerDrag={(id, lat, lng) => patch(id, { lat: +lat.toFixed(6), lng: +lng.toFixed(6) })} fitKey="stops" />
         </div>
         <ol className="mt-3 space-y-1">
           {doc.stops.map((s, i) => (
@@ -57,6 +59,11 @@ export default function StopsTab({ doc, setDoc, themes }: Props) {
           <div className="grid gap-3">
             <label>Title<input className={input} value={stop.title} onChange={(e) => patch(stop.id, { title: e.target.value })} /></label>
             <label>Story (markdown)<textarea className={`${input} font-mono text-sm`} rows={8} value={stop.story} onChange={(e) => patch(stop.id, { story: e.target.value })} /></label>
+            <TagsField tags={stop.tags} onChange={(tags) => patch(stop.id, { tags })} />
+            <div>
+              <span className="mb-1 block">Map marker</span>
+              <MarkerPicker value={stop.markerIcon} onChange={(markerIcon) => patch(stop.id, { markerIcon })} images={markerImages} emptyLabel="Tour default" color={{ value: stop.markerColor, onChange: (markerColor) => patch(stop.id, { markerColor }), fallback: String(tokens.colors.marker) }} />
+            </div>
             <div className="grid grid-cols-3 gap-2">
               <label>Lat<input type="number" step="any" className={input} value={stop.lat} onChange={(e) => patch(stop.id, { lat: Number(e.target.value) })} /></label>
               <label>Lng<input type="number" step="any" className={input} value={stop.lng} onChange={(e) => patch(stop.id, { lng: Number(e.target.value) })} /></label>

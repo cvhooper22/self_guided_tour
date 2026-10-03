@@ -32,6 +32,11 @@ export default async function TourOverview({ params }: PageProps<"/tour/[slug]">
         {tour.status !== "published" && <p className="t-chip mb-3 inline-block">Draft — only you and admins can see this</p>}
         <h1 className="text-4xl">{tour.title}</h1>
         <p className="t-muted mt-2">{tour.city} · {b.stops.length} stops · {tour.isFree ? "Free" : "Paid"}</p>
+        {tour.tags.length > 0 && (
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {tour.tags.map((x) => <Link key={x} href={`/tours?${new URLSearchParams({ tag: x })}`} className="t-chip no-underline" data-testid="tour-tag">{x}</Link>)}
+          </div>
+        )}
         {tokens.copy.welcome && <p className="mx-auto mt-3 max-w-xl">{tokens.copy.welcome}</p>}
         <Link href={`/play/${tour.slug}`} className="t-btn mt-6">{tokens.copy.startLabel} →</Link>
       </div>

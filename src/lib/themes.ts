@@ -7,6 +7,9 @@ export const FONT_CHOICES = [
   "Special Elite", "Mountains of Christmas", "Pacifico", "Oswald", "Roboto Slab", "Crimson Text",
 ] as const;
 
+/** Map looks. All but "custom" are plain OSM tiles with a CSS filter (see .tiles-* in globals.css). */
+export const TILE_STYLES = ["light", "dark", "sepia", "ocean", "midnight", "blueprint", "ember", "forest", "noir", "custom"] as const;
+
 const color = z.string().default("#000000");
 
 // Each group has defaults and is passthrough, so new options can be added later
@@ -24,6 +27,8 @@ export const themeTokensSchema = z.looseObject({
     link: color.default("#7a3e1d"),
     marker: color.default("#7a3e1d"),
     routeLine: color.default("#c9902b"),
+    /** Colour of the highlighted leg to the next stop. Empty = automatic (accent, or hot pink if that matches the route line). */
+    highlight: z.string().default(""),
   }).prefault({}),
   typography: z.looseObject({
     headingFont: z.string().default("Merriweather"),
@@ -40,9 +45,10 @@ export const themeTokensSchema = z.looseObject({
     shadow: z.enum(["none", "soft", "hard"]).default("soft"),
   }).prefault({}),
   map: z.looseObject({
-    tileStyle: z.enum(["light", "dark", "sepia", "custom"]).default("light"),
+    tileStyle: z.enum(TILE_STYLES).default("light"),
     customTileUrl: z.string().default(""),
     markerShape: z.enum(["pin", "circle", "diamond"]).default("pin"),
+    markerIcon: z.string().default(""),
     routeLineStyle: z.enum(["solid", "dashed"]).default("solid"),
   }).prefault({}),
   imagery: z.looseObject({
@@ -60,6 +66,12 @@ export const themeTokensSchema = z.looseObject({
 
 export type ThemeTokens = z.infer<typeof themeTokensSchema>;
 export type PartialTokens = Record<string, unknown>;
+
+export function highlightColor(t: ThemeTokens): string {
+  const c = t.colors;
+  if (/^#[0-9a-f]{6}$/i.test(c.highlight)) return c.highlight;
+  return c.accent.toLowerCase() === c.routeLine.toLowerCase() ? "#ff2d6f" : c.accent;
+}
 
 export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -120,12 +132,12 @@ export function tileConfig(t: ThemeTokens): { url: string; attribution: string; 
     case "dark":
       // CARTO's basemaps now require an API key, so "dark" is OSM tiles darkened with a CSS filter.
       return { ...osm, className: "tiles-dark" };
-    case "sepia":
-      return { ...osm, className: "tiles-sepia" };
     case "custom":
       return t.map.customTileUrl ? { url: t.map.customTileUrl, attribution: "", className: "" } : { ...osm, className: "" };
-    default:
+    case "light":
       return { ...osm, className: "" };
+    default:
+      return { ...osm, className: `tiles-${t.map.tileStyle}` };
   }
 }
 
@@ -164,13 +176,81 @@ export const PRESETS: { key: string; name: string; tokens: PartialTokens }[] = [
       copy: { stopLabel: "Stop", startLabel: "Let's go caroling" },
     },
   },
+  {
+    key: "ocean",
+    name: "Ocean",
+    tokens: {
+      colors: { background: "#eef7fa", surface: "#ffffff", text: "#0f2a3a", mutedText: "#55738a", primary: "#0e7490", primaryText: "#ffffff", accent: "#f59e0b", border: "#cfe4ec", link: "#0e7490", marker: "#0b3c5d", routeLine: "#f97316" },
+      typography: { headingFont: "Pacifico", bodyFont: "Inter", headingWeight: 400 },
+      shape: { radius: 16, shadow: "soft" },
+      map: { tileStyle: "ocean", markerShape: "pin" },
+      copy: { stopLabel: "Stop", startLabel: "Set sail" },
+    },
+  },
+  {
+    key: "midnight",
+    name: "Midnight",
+    tokens: {
+      colors: { background: "#0a1020", surface: "#121a2e", text: "#e4ebf7", mutedText: "#8b98b5", primary: "#6ea8ff", primaryText: "#04101f", accent: "#ffd166", border: "#22304f", link: "#8ab8ff", marker: "#ffd166", routeLine: "#5eead4" },
+      typography: { headingFont: "Oswald", bodyFont: "Inter", headingTransform: "uppercase", headingTracking: 0.04 },
+      shape: { radius: 10, shadow: "soft" },
+      map: { tileStyle: "midnight", markerShape: "circle" },
+      imagery: { heroOverlay: 0.5 },
+      copy: { stopLabel: "Stop", startLabel: "Start the night walk" },
+    },
+  },
+  {
+    key: "blueprint",
+    name: "Blueprint",
+    tokens: {
+      colors: { background: "#0c2250", surface: "#14306b", text: "#eaf2ff", mutedText: "#9db8e8", primary: "#ffffff", primaryText: "#0c2250", accent: "#7dd3fc", border: "#2a4a8c", link: "#bfe0ff", marker: "#ffffff", routeLine: "#ffe27a" },
+      typography: { headingFont: "Special Elite", bodyFont: "Inter", headingWeight: 400 },
+      shape: { radius: 2, borderWidth: 2, shadow: "hard" },
+      map: { tileStyle: "blueprint", markerShape: "diamond", routeLineStyle: "dashed" },
+      copy: { stopLabel: "Point", startLabel: "Open the plans" },
+    },
+  },
+  {
+    key: "ember",
+    name: "Ember",
+    tokens: {
+      colors: { background: "#140808", surface: "#231010", text: "#f6e7e4", mutedText: "#b08a85", primary: "#ff5a4d", primaryText: "#1a0504", accent: "#ffb36b", border: "#3a1b18", link: "#ff8a7a", marker: "#fff1e0", routeLine: "#ffd166" },
+      typography: { headingFont: "Playfair Display", bodyFont: "Lora", headingTransform: "uppercase", headingTracking: 0.06 },
+      shape: { radius: 8, shadow: "soft" },
+      map: { tileStyle: "ember", markerShape: "pin" },
+      imagery: { heroOverlay: 0.6 },
+      copy: { stopLabel: "Stop", startLabel: "Light the way" },
+    },
+  },
+  {
+    key: "forest",
+    name: "Forest",
+    tokens: {
+      colors: { background: "#f1f6ee", surface: "#ffffff", text: "#1c2b1f", mutedText: "#5c705f", primary: "#2f6b3f", primaryText: "#ffffff", accent: "#b7791f", border: "#d5e2d0", link: "#2f6b3f", marker: "#1f4d2b", routeLine: "#b7791f" },
+      typography: { headingFont: "Merriweather", bodyFont: "Lora", baseSize: 17 },
+      shape: { radius: 12, shadow: "soft" },
+      map: { tileStyle: "forest", markerShape: "pin" },
+      copy: { stopLabel: "Waypoint", startLabel: "Hit the trail" },
+    },
+  },
+  {
+    key: "noir",
+    name: "Noir",
+    tokens: {
+      colors: { background: "#f4f4f4", surface: "#ffffff", text: "#111111", mutedText: "#666666", primary: "#111111", primaryText: "#ffffff", accent: "#d00000", border: "#d9d9d9", link: "#111111", marker: "#111111", routeLine: "#d00000" },
+      typography: { headingFont: "Roboto Slab", bodyFont: "Inter", headingTransform: "uppercase", headingTracking: 0.02 },
+      shape: { radius: 0, borderWidth: 2, shadow: "hard" },
+      map: { tileStyle: "noir", markerShape: "circle" },
+      copy: { stopLabel: "Scene", startLabel: "Begin the case" },
+    },
+  },
 ];
 
 /** Dropdown options for enum-like tokens, keyed by "group.key". Anything not listed is edited by value type. */
 export const TOKEN_OPTIONS: Record<string, readonly string[]> = {
   "typography.headingTransform": ["none", "uppercase", "capitalize"],
   "shape.shadow": ["none", "soft", "hard"],
-  "map.tileStyle": ["light", "dark", "sepia", "custom"],
+  "map.tileStyle": TILE_STYLES,
   "map.markerShape": ["pin", "circle", "diamond"],
   "map.routeLineStyle": ["solid", "dashed"],
 };

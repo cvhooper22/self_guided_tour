@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { routeSig } from "../../src/lib/directions";
 
 async function signIn(page: Page, who: "traveler" | "operator" | "admin") {
   await page.goto("/login");
@@ -91,4 +92,148 @@ test("admin sees all tours incl. drafts, raw view, and can view-as a user", asyn
   await page.getByRole("button", { name: "Stop viewing as" }).click();
   await page.goto("/admin/audit");
   await expect(page.getByText("admin.impersonate.start").first()).toBeVisible();
+});
+
+test("travelers can filter tours by operator-defined tag", async ({ page }) => {
+  await page.goto("/tours");
+  await expect(page.getByTestId("tour-card")).toHaveCount(3);
+  await page.getByTestId("tag-filter").filter({ hasText: "Ghost stories" }).click();
+  await expect(page).toHaveURL(/tag=Ghost\+stories/);
+  await expect(page.getByTestId("tour-card")).toHaveCount(1);
+  await expect(page.getByTestId("tour-card")).toContainText("Savannah After Dark");
+  await expect(page.getByTestId("tour-tag")).toHaveText("Ghost stories");
+});
+
+test("operator adds a tag and it shows on the tour page", async ({ page }) => {
+  await signIn(page, "operator");
+  await newTour(page);
+  await page.getByLabel("Tags").fill("Local favorite");
+  await page.getByLabel("Tags").press("Enter");
+  await page.getByLabel("Tags").fill("local FAVORITE");
+  await page.getByLabel("Tags").press("Enter");
+  await expect(page.getByRole("button", { name: "Remove tag Local favorite" })).toHaveCount(1);
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("status")).toHaveText("Saved");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Remove tag Local favorite" })).toBeVisible();
+});
+
+test("stop tags show in the player and make the tour findable by that tag", async ({ page }) => {
+  await page.goto("/tours?tag=Verified");
+  await expect(page.getByTestId("tour-card")).toHaveCount(1);
+  await expect(page.getByTestId("tour-card")).toContainText("Squares of Savannah");
+  await page.goto("/play/savannah-squares");
+  await page.getByRole("button", { name: /Colonial Park Cemetery/ }).first().click();
+  await expect(page.getByTestId("stop-tag")).toHaveText("Verified");
+});
+
+test("operator can tag a stop and it persists", async ({ page }) => {
+  await signIn(page, "operator");
+  const res = await page.request.post("/api/operator/tours", { data: { title: `E2E ${Date.now()}` } });
+  const { id } = await res.json();
+  await page.goto(`/operator/tours/${id}`);
+  await page.getByRole("button", { name: "Stops & sources" }).or(page.getByRole("tab", { name: "Stops & sources" })).click();
+  await page.getByRole("button", { name: "+ Add stop on map" }).click();
+  await page.locator(".leaflet-container").click({ position: { x: 200, y: 150 } });
+  await page.getByLabel("Tags").fill("Verified");
+  await page.getByLabel("Tags").press("Enter");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("status")).toHaveText("Saved");
+  const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
+  expect(b.stops[0].tags).toEqual(["Verified"]);
+});
+
+test("operator can pick a custom marker for a stop and it renders", async ({ page }) => {
+  await signIn(page, "operator");
+  const { id } = await (await page.request.post("/api/operator/tours", { data: { title: `E2E ${Date.now()}` } })).json();
+  await page.goto(`/operator/tours/${id}`);
+  await page.getByRole("button", { name: "Stops & sources" }).or(page.getByRole("tab", { name: "Stops & sources" })).click();
+  await page.getByRole("button", { name: "+ Add stop on map" }).click();
+  await page.locator(".leaflet-container").click({ position: { x: 200, y: 150 } });
+  await page.getByRole("button", { name: "Marker 👻" }).click();
+  await expect(page.locator(".tm-marker").first()).toHaveText("👻");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("status")).toHaveText("Saved");
+  const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
+  expect(b.stops[0].markerIcon).toBe("👻");
+  // Invalid markers are rejected server-side.
+  b.stops[0].markerIcon = "https://evil.example/x.png";
+  const bad = await page.request.put(`/api/operator/tours/${id}`, { data: { tour: b.tour, stops: b.stops, routes: b.routes } });
+  expect(bad.ok()).toBe(false);
+});
+
+test("operator draws a walking path on a route and travelers get directions links", async ({ page }) => {
+  await signIn(page, "operator");
+  const { id, slug } = await (await page.request.post("/api/operator/tours", { data: { title: `E2E ${Date.now()}` } })).json();
+  await page.goto(`/operator/tours/${id}`);
+  await page.getByRole("button", { name: "Stops & sources" }).or(page.getByRole("tab", { name: "Stops & sources" })).click();
+  for (const x of [150, 300]) {
+    await page.getByRole("button", { name: "+ Add stop on map" }).click();
+    await page.locator(".leaflet-container").click({ position: { x, y: 150 } });
+  }
+  await page.getByRole("button", { name: "Routes" }).or(page.getByRole("tab", { name: "Routes" })).click();
+  await page.getByRole("button", { name: "+ Add route" }).click();
+  await page.getByRole("button", { name: "Draw walking path" }).click();
+  await page.getByText("More").click();
+  await page.getByRole("button", { name: "Start from stops (straight lines)" }).click();
+  await expect(page.getByText(/^2 points/)).toBeVisible();
+  await page.getByRole("button", { name: "＋ Add points at end" }).click();
+  await page.locator(".leaflet-container").click({ position: { x: 400, y: 250 } });
+  await page.locator(".leaflet-container").click({ position: { x: 450, y: 300 } });
+  await page.getByRole("button", { name: "Done drawing" }).click();
+  await expect(page.getByText(/^4 points/)).toBeVisible();
+  // Redraw the section between the first and last point.
+  const vertex = (i: number) => page.locator(`.tm-vertex[data-i="${i}"]`).dispatchEvent("click");
+  await vertex(0); await vertex(3);
+  await page.getByRole("button", { name: /Redraw between #1 and #4/ }).click();
+  await expect(page.getByText(/^2 points/)).toBeVisible();
+  await page.locator(".leaflet-container").click({ position: { x: 300, y: 320 } });
+  await page.getByRole("button", { name: "Done drawing" }).click();
+  await expect(page.getByText(/^3 points/)).toBeVisible();
+  // Undo steps back through the redraw.
+  await page.getByRole("button", { name: "↶ Undo" }).click();
+  await expect(page.getByText(/^2 points/)).toBeVisible();
+  await page.getByRole("button", { name: "↷ Redo" }).click();
+  await expect(page.getByText(/^3 points/)).toBeVisible();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("status")).toHaveText("Saved");
+  const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
+  expect(b.routes[0].path).toHaveLength(3);
+  // The snap endpoint validates its input before calling the routing service (so this never spends quota).
+  const snap = await page.request.post("/api/operator/route-snap", { data: { points: [b.routes[0].path[0]] } });
+  expect(snap.status()).toBe(400);
+  // Out-of-range points are rejected server-side.
+  b.routes[0].path = [[999, 0]];
+  expect((await page.request.put(`/api/operator/tours/${id}`, { data: { tour: b.tour, stops: b.stops, routes: b.routes } })).ok()).toBe(false);
+  void slug;
+});
+
+test("player shows walking directions links for a stop", async ({ page }) => {
+  await page.goto("/play/savannah-squares");
+  await page.getByRole("button", { name: /^Next:/ }).click();
+  await expect(page.getByRole("link", { name: "Google Maps" })).toHaveAttribute("href", /travelmode=walking/);
+  await expect(page.getByRole("link", { name: "Apple Maps" })).toHaveAttribute("href", /dirflg=w/);
+});
+
+test("player shows saved step-by-step directions only while they are up to date", async ({ page }) => {
+  await signIn(page, "operator");
+  const { id, slug } = await (await page.request.post("/api/operator/tours", { data: { title: `E2E ${Date.now()}` } })).json();
+  const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
+  const stops = [0, 1].map((i) => ({ id: crypto.randomUUID(), title: `Stop ${i + 1}`, lat: 32.07 + i * 0.002, lng: -81.09, radiusM: 40, story: "", tags: [], markerIcon: "", markerColor: "", sources: [] }));
+  const path: [number, number][] = [[32.07, -81.09], [32.071, -81.09], [32.072, -81.09]];
+  const stopIds = stops.map((x) => x.id);
+  const route = { id: crypto.randomUUID(), name: "Walk", description: "", stopIds, path, directions: { sig: routeSig(path, stopIds), steps: [{ text: "Head north on Bull Street", distanceM: 222, at: path[0], leg: 0 }, { text: "Arrive at your destination", distanceM: 0, at: path[2], leg: 0 }] } };
+  const put = (r: object) => page.request.put(`/api/operator/tours/${id}`, { data: { tour: b.tour, stops, routes: [r] } });
+  expect((await put(route)).ok()).toBe(true);
+  await page.goto(`/play/${slug}`);
+  await page.getByRole("combobox").selectOption({ label: "Walk" });
+  await page.getByRole("button", { name: /Stop 1/ }).first().click();
+  await page.getByText("Step-by-step to Stop 2").click();
+  await expect(page.getByText("Head north on Bull Street")).toBeVisible();
+  // Changing the path makes the saved directions stale, so travelers stop seeing them.
+  expect((await put({ ...route, path: [...path, [32.073, -81.09]] })).ok()).toBe(true);
+  await page.goto(`/play/${slug}`);
+  await page.getByRole("combobox").selectOption({ label: "Walk" });
+  await page.getByRole("button", { name: /Stop 1/ }).first().click();
+  await expect(page.getByText("Step-by-step to Stop 2")).toHaveCount(0);
 });

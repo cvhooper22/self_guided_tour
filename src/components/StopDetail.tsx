@@ -28,6 +28,11 @@ export function SourcesPanel({ sources }: { sources: SourceView[] }) {
   );
 }
 
+export function TagChips({ tags }: { tags: string[] }) {
+  if (!tags.length) return null;
+  return <div className="mb-3 flex flex-wrap gap-1">{tags.map((x) => <span key={x} className="t-chip" data-testid="stop-tag">{x}</span>)}</div>;
+}
+
 export function StopStory({ story }: { story: string }) {
   return (
     <div className="space-y-3 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5">
