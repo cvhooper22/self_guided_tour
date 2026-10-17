@@ -1,9 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "./client";
 import { PRESETS, THEME_SCHEMA_VERSION } from "../lib/themes";
-import { chicoFullTourPath, chicoFullTourSteps } from "./chico-ghost-route-data";
+import { chicoFullTourPath, chicoFullTourSteps, chicoDriveWalkPath, chicoDriveWalkSteps } from "./chico-ghost-route-data";
 import { assignLegs, routeSig } from "../lib/directions";
 import { chicoGhostTour, chicoGhostRoutes, chicoGhostFacts, type SeedStop } from "./chico-ghost-tour";
+
+const chicoLines = { full: { path: chicoFullTourPath, steps: chicoFullTourSteps }, driveWalk: { path: chicoDriveWalkPath, steps: chicoDriveWalkSteps } };
 
 const { users, themes, tours, stops, stopSources, routes, facts } = schema;
 
@@ -29,7 +31,7 @@ async function main() {
     }
   }
 
-  const seedTours: { slug: string; title: string; summary: string; story: string; city: string; lat: number; lng: number; theme: string; stops: (Omit<SeedStop, "key"> & { key?: string })[]; status?: "draft" | "published"; tags?: string[]; routes?: { name: string; description: string; keys: string[]; drawn?: boolean; pathKeys?: string[] }[] }[] = [
+  const seedTours: { slug: string; title: string; summary: string; story: string; city: string; lat: number; lng: number; theme: string; stops: (Omit<SeedStop, "key"> & { key?: string })[]; status?: "draft" | "published"; tags?: string[]; routes?: { name: string; description: string; keys: string[]; drawn?: boolean; line?: "full" | "driveWalk"; pathKeys?: string[] }[] }[] = [
     {
       slug: "savannah-squares", title: "Squares of Savannah", city: "Savannah, GA", lat: 32.0745, lng: -81.0925, theme: "history",
       summary: "A stroll through Oglethorpe's famous city squares and the stories they hold.",
@@ -93,8 +95,9 @@ async function main() {
         // Directions are fingerprinted against the stop ids, which are new on every rebuild, so sign them here.
         // Legs are re-derived from where each step falls along the line, so adding or moving a stop keeps them right. A stop past the end of the line (pathKeys) has no steps.
         const stopPoints = (r.pathKeys ?? r.keys).map((k) => { const st = t.stops.find((x) => x.key === k)!; return [st.lat, st.lng] as [number, number]; });
-        const steps = assignLegs(chicoFullTourSteps.map(({ text, distanceM, at }) => ({ text, distanceM, at })), chicoFullTourPath, stopPoints);
-        const drawn = r.drawn ? { path: chicoFullTourPath, directions: { sig: routeSig(chicoFullTourPath, stopIds), steps } } : {};
+        const line = chicoLines[r.line ?? "full"];
+        const steps = assignLegs(line.steps.map(({ text, distanceM, at }) => ({ text, distanceM, at })), line.path, stopPoints);
+        const drawn = r.drawn ? { path: line.path, directions: { sig: routeSig(line.path, stopIds), steps } } : {};
         await db.insert(routes).values({ tourId: row.id, name: r.name, description: r.description, stopIds, ...drawn });
       }
       continue;
