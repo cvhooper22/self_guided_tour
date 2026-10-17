@@ -1,5 +1,6 @@
 "use client";
 import Flourish from "./Flourish";
+import ZoomImage from "./ZoomImage";
 import { ChevronIcon, CloseIcon, FactIcon, LocateIcon } from "./PlayerIcons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -250,7 +251,7 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
                 <span className="t-chip t-chip-icon">Did you know?</span>
                 <button className="t-btn-ghost t-icon" aria-label="Close fact" onClick={() => { setFactId(null); setFactWide(false); }}><CloseIcon /></button>
               </div>
-              {factImg && <img src={factImg} alt="" className="mb-2 max-h-48 w-full object-cover" style={{ borderRadius: "var(--t-radius)" }} />}
+              {factImg && <ZoomImage src={factImg} alt="" className="mb-2 max-h-48 w-full object-cover" style={{ borderRadius: "var(--t-radius)" }} />}
               <div className="space-y-2 text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-5"><Markdown>{fact.text}</Markdown></div>
               <div className="mt-3 flex items-center justify-between gap-2">
                 {deck.length > 1 ? (
@@ -363,7 +364,7 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
                     return (
                       <li key={f.id} className={i > 0 ? "mt-3" : ""}>
                         {i > 0 && <Flourish className="mb-3" />}
-                        {img && <img src={img} alt="" className="mb-2 max-h-48 w-full object-cover" style={{ borderRadius: "var(--t-radius)" }} />}
+                        {img && <ZoomImage src={img} alt="" className="mb-2 max-h-48 w-full object-cover" style={{ borderRadius: "var(--t-radius)" }} />}
                         <div className="space-y-2 text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-5"><Markdown>{f.text}</Markdown></div>
                       </li>
                     );
