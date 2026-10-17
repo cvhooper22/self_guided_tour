@@ -66,7 +66,7 @@ test("operator edits a tour and the change persists", async ({ page }) => {
   const title = `Edited ${Date.now()}`;
   await page.getByLabel("Title").first().fill(title);
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved");
+  await expect(page.locator("[role=status]:not([id^=DndLiveRegion])")).toHaveText("Saved");
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
 });
@@ -113,7 +113,7 @@ test("operator adds a tag and it shows on the tour page", async ({ page }) => {
   await page.getByLabel("Tags").press("Enter");
   await expect(page.getByRole("button", { name: "Remove tag Local favorite" })).toHaveCount(1);
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved");
+  await expect(page.locator("[role=status]:not([id^=DndLiveRegion])")).toHaveText("Saved");
   await page.reload();
   await expect(page.getByRole("button", { name: "Remove tag Local favorite" })).toBeVisible();
 });
@@ -138,7 +138,7 @@ test("operator can tag a stop and it persists", async ({ page }) => {
   await page.getByLabel("Tags").fill("Verified");
   await page.getByLabel("Tags").press("Enter");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved");
+  await expect(page.locator("[role=status]:not([id^=DndLiveRegion])")).toHaveText("Saved");
   const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
   expect(b.stops[0].tags).toEqual(["Verified"]);
 });
@@ -153,7 +153,7 @@ test("operator can pick a custom marker for a stop and it renders", async ({ pag
   await page.getByRole("button", { name: "Marker 👻" }).click();
   await expect(page.locator(".tm-marker").first()).toHaveText("👻");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved");
+  await expect(page.locator("[role=status]:not([id^=DndLiveRegion])")).toHaveText("Saved");
   const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
   expect(b.stops[0].markerIcon).toBe("👻");
   // Invalid markers are rejected server-side.
@@ -196,7 +196,7 @@ test("operator draws a walking path on a route and travelers get directions link
   await page.getByRole("button", { name: "↷ Redo" }).click();
   await expect(page.getByText(/^3 points/)).toBeVisible();
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved");
+  await expect(page.locator("[role=status]:not([id^=DndLiveRegion])")).toHaveText("Saved");
   const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
   expect(b.routes[0].path).toHaveLength(3);
   // The snap endpoint validates its input before calling the routing service (so this never spends quota).
@@ -236,4 +236,46 @@ test("player shows saved step-by-step directions only while they are up to date"
   await page.getByRole("combobox").selectOption({ label: "Walk" });
   await page.getByRole("button", { name: /Stop 1/ }).first().click();
   await expect(page.getByText("Step-by-step to Stop 2")).toHaveCount(0);
+});
+
+test("fun facts: tour-wide and stop-scoped facts show in the player and cycle", async ({ page }) => {
+  await signIn(page, "operator");
+  const { id, slug } = await (await page.request.post("/api/operator/tours", { data: { title: `E2E facts ${Date.now()}` } })).json();
+  const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
+  const stops = [0, 1].map((i) => ({ id: crypto.randomUUID(), title: `Stop ${i + 1}`, lat: 32.07 + i * 0.002, lng: -81.09, radiusM: 40, story: "", tags: [], markerIcon: "", markerColor: "", sources: [] }));
+  const fact = (text: string, extra = {}) => ({ id: crypto.randomUUID(), text, imageUrl: "", lat: null, lng: null, radiusM: 60, nearStopId: null, inPool: false, ...extra });
+  const facts = [fact("Wide fact one"), fact("Wide fact two"), fact("Scoped to stop two", { nearStopId: stops[1].id }), fact("Scoped but swipeable", { nearStopId: stops[1].id, inPool: true })];
+  expect((await page.request.put(`/api/operator/tours/${id}`, { data: { tour: b.tour, stops, routes: [], facts } })).ok()).toBe(true);
+  await page.goto(`/play/${slug}`);
+  await page.getByRole("button", { name: /Did you know/ }).click();
+  const card = page.getByRole("note", { name: "Fun fact" });
+  await expect(card.getByText("Wide fact one")).toBeVisible();
+  await page.getByRole("button", { name: "Next fact" }).click();
+  await expect(card.getByText("Wide fact two")).toBeVisible();
+  // A located fact marked for the swipe-through is reachable from anywhere.
+  await page.getByRole("button", { name: "Next fact" }).click();
+  await expect(card.getByText("Scoped but swipeable")).toBeVisible();
+  // Scoped facts stay out of the pool until the traveler is at or heading to that stop.
+  await expect(card.getByText("Scoped to stop two")).toHaveCount(0);
+});
+
+test("operator reorders facts by dragging", async ({ page }) => {
+  await signIn(page, "operator");
+  const { id } = await (await page.request.post("/api/operator/tours", { data: { title: `E2E drag ${Date.now()}` } })).json();
+  const b = await (await page.request.get(`/api/operator/tours/${id}`)).json();
+  const fact = (text: string) => ({ id: crypto.randomUUID(), text, imageUrl: "", lat: null, lng: null, radiusM: 60, nearStopId: null, inPool: false });
+  expect((await page.request.put(`/api/operator/tours/${id}`, { data: { tour: b.tour, stops: [], routes: [], facts: [fact("Alpha fact"), fact("Beta fact"), fact("Gamma fact")] } })).ok()).toBe(true);
+  await page.goto(`/operator/tours/${id}`);
+  await page.getByRole("tab", { name: "Fun facts" }).click();
+  const rows = page.getByRole("listitem").filter({ hasText: / fact/ });
+  await expect(rows.first()).toContainText("Alpha");
+  const grip = page.getByRole("button", { name: "Reorder fact" }).first();
+  const to = await rows.nth(2).boundingBox();
+  const from = await grip.boundingBox();
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from!.x + 5, to!.y + to!.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(rows.first()).toContainText("Beta");
+  await expect(rows.nth(2)).toContainText("Alpha");
 });

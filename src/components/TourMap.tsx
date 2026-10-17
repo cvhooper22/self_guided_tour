@@ -28,6 +28,8 @@ type Props = {
   onMapClick?: (lat: number, lng: number) => void;
   onMarkerDrag?: (id: string, lat: number, lng: number) => void;
   fitKey?: string;
+  /** Pixels at the bottom covered by UI (mobile sheet); selected stops are centred in the remaining area. */
+  bottomInset?: number;
   className?: string;
 };
 
@@ -67,7 +69,9 @@ export default function TourMap(p: Props) {
     const drawn = p.path && p.path.length > 1 ? p.path : null;
     const line = drawn ?? (p.routeIds ?? []).map((id) => byId.get(id)).filter(Boolean).map((s) => [s!.lat, s!.lng] as [number, number]);
     if (line.length > 1) {
-      const pl = L.polyline(line, { color: String(p.tokens.colors.routeLine), weight: 4, dashArray: p.tokens.map.routeLineStyle === "dashed" ? "8 8" : undefined, interactive: !!cb.current.onPathChange }).addTo(g);
+      // "inlay": a dark casing under a lighter core, like metal set into the map.
+      if (p.tokens.map.routeLineStyle === "inlay") L.polyline(line, { color: String(p.tokens.colors.background), weight: 9, opacity: 0.9, lineCap: "round", interactive: false }).addTo(g);
+      const pl = L.polyline(line, { color: String(p.tokens.colors.routeLine), weight: p.tokens.map.routeLineStyle === "inlay" ? 5 : 4, dashArray: p.tokens.map.routeLineStyle === "dashed" ? "8 8" : undefined, interactive: !!cb.current.onPathChange }).addTo(g);
       pl.on("click", (e) => {
         if (!drawn || !cb.current.onPathChange) return;
         L.DomEvent.stopPropagation(e);
@@ -96,7 +100,7 @@ export default function TourMap(p: Props) {
       });
     p.stops.forEach((s, i) => {
       const m = parseMarker(s.icon) ?? parseMarker(defaultIcon);
-      const state = `${s.visited ? " visited" : ""}${s.id === p.selectedId ? " selected" : ""}`;
+      const state = `${s.visited ? " visited" : " unvisited"}${s.id === p.selectedId ? " selected" : ""}`;
       const el = document.createElement("div");
       if (m?.kind === "image") {
         el.className = `tm-marker-img${state}`;
@@ -111,7 +115,8 @@ export default function TourMap(p: Props) {
         if (s.color && /^#[0-9a-f]{6}$/i.test(s.color)) el.style.setProperty("--t-marker", s.color);
       }
       const big = m?.kind === "image";
-      const icon = L.divIcon({ className: "", html: el, iconSize: big ? [40, 40] : [26, 26], iconAnchor: big ? [20, 20] : [13, 13] });
+      const px = big ? 40 : shape === "deco" ? 44 : 26;
+      const icon = L.divIcon({ className: "", html: el, iconSize: [px, px], iconAnchor: [px / 2, px / 2] });
       const mk = L.marker([s.lat, s.lng], { icon, title: s.label, draggable: !!cb.current.onMarkerDrag }).addTo(g);
       mk.on("click", (e) => { L.DomEvent.stopPropagation(e); cb.current.onSelect?.(s.id); });
       mk.on("dragend", () => { const ll = mk.getLatLng(); cb.current.onMarkerDrag?.(s.id, ll.lat, ll.lng); });
@@ -132,9 +137,14 @@ export default function TourMap(p: Props) {
 
   useEffect(() => {
     const s = p.stops.find((x) => x.id === p.selectedId);
-    if (s && map.current) map.current.panTo([s.lat, s.lng]);
+    const m = map.current;
+    if (!s || !m) return;
+    m.invalidateSize();
+    const size = m.getSize();
+    const pt = m.latLngToContainerPoint([s.lat, s.lng]);
+    m.panBy([pt.x - size.x / 2, pt.y - (size.y - (p.bottomInset ?? 0)) / 2]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.selectedId]);
+  }, [p.selectedId, p.bottomInset]);
 
   return <div ref={el} className={p.className ?? "h-full w-full"} role="application" aria-label="Tour map" />;
 }

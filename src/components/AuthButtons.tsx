@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 export function LogoutButton() {
   const r = useRouter();
   return (
-    <button className="underline" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); r.push("/"); r.refresh(); }}>
+    <button className="nav-action underline" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); r.push("/"); r.refresh(); }}>
       Sign out
     </button>
   );

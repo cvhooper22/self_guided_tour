@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PRESETS, deepMerge, resolveTokens, setPath, themeTokensSchema, tileConfig, tokensToCssVars } from "@/lib/themes";
+import { PRESETS, deepMerge, resolveTokens, setPath, themeAttrs, themeTokensSchema, tileConfig, tokensToCssVars } from "@/lib/themes";
 
 describe("theme tokens", () => {
   it("fills defaults for an empty theme", () => {
@@ -54,5 +54,21 @@ describe("theme tokens", () => {
 
   it("maps tile styles without needing an API key", () => {
     for (const s of ["light", "dark", "sepia"] as const) expect(tileConfig(resolveTokens({ map: { tileStyle: s } })).url).toContain("openstreetmap.org");
+  });
+
+  it("classic themes stay solid and round; the deco preset opts into glass, notched edges and a double frame", () => {
+    expect(themeAttrs(resolveTokens({}))).toEqual({ "data-surface": "solid", "data-edge": "round", "data-frame": "none", "data-ornament": "curl", "data-quote": "plain" });
+    const deco = PRESETS.find((p) => p.key === "deco")!;
+    const t = resolveTokens(deco.tokens);
+    expect(themeAttrs(t)).toEqual({ "data-surface": "glass", "data-edge": "notched", "data-frame": "double", "data-ornament": "deco", "data-quote": "gilt" });
+    expect(t.map.markerShape).toBe("deco");
+    expect(tokensToCssVars(t)["--t-label-transform"]).toBe("uppercase");
+  });
+
+  it("per-tour overrides can switch deco structure back off", () => {
+    const deco = PRESETS.find((p) => p.key === "deco")!;
+    const t = resolveTokens(deco.tokens, { shape: { surface: "solid", frame: "none" } });
+    expect(themeAttrs(t)["data-surface"]).toBe("solid");
+    expect(themeAttrs(t)["data-edge"]).toBe("notched");
   });
 });
