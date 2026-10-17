@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getSession, realAdminId } from "@/lib/auth";
 import { getTourBySlug } from "@/lib/tours-repo";
 import { ThemeScope } from "@/components/ThemeScope";
+import NavTheme from "@/components/NavTheme";
 import { StopStory } from "@/components/StopDetail";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function TourOverview({ params }: PageProps<"/tour/[slug]">
   const { tour, tokens } = b;
   return (
     <ThemeScope tokens={tokens} className="flex-1">
+      <NavTheme tokens={tokens} />
       <div className="t-hero px-4 py-14 text-center" style={tour.coverUrl ? { backgroundImage: `url("${tour.coverUrl.replace(/"/g, "")}")` } : undefined}>
         {tour.status !== "published" && <p className="t-chip mb-3 inline-block">Draft — only you and admins can see this</p>}
         <h1 className="text-4xl">{tour.title}</h1>

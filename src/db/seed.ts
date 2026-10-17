@@ -1,9 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "./client";
 import { PRESETS, THEME_SCHEMA_VERSION } from "../lib/themes";
-import { chicoGhostTour, chicoGhostRoutes, type SeedStop } from "./chico-ghost-tour";
+import { chicoFullTourPath, chicoFullTourSteps } from "./chico-ghost-route-data";
+import { assignLegs, routeSig } from "../lib/directions";
+import { chicoGhostTour, chicoGhostRoutes, chicoGhostFacts, type SeedStop } from "./chico-ghost-tour";
 
-const { users, themes, tours, stops, stopSources, routes } = schema;
+const { users, themes, tours, stops, stopSources, routes, facts } = schema;
 
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL ?? "admin@example.com";
@@ -27,7 +29,7 @@ async function main() {
     }
   }
 
-  const seedTours: { slug: string; title: string; summary: string; story: string; city: string; lat: number; lng: number; theme: string; stops: (Omit<SeedStop, "key"> & { key?: string })[]; status?: "draft" | "published"; tags?: string[]; routes?: { name: string; description: string; keys: string[] }[] }[] = [
+  const seedTours: { slug: string; title: string; summary: string; story: string; city: string; lat: number; lng: number; theme: string; stops: (Omit<SeedStop, "key"> & { key?: string })[]; status?: "draft" | "published"; tags?: string[]; routes?: { name: string; description: string; keys: string[]; drawn?: boolean; pathKeys?: string[] }[] }[] = [
     {
       slug: "savannah-squares", title: "Squares of Savannah", city: "Savannah, GA", lat: 32.0745, lng: -81.0925, theme: "history",
       summary: "A stroll through Oglethorpe's famous city squares and the stories they hold.",
@@ -75,8 +77,26 @@ async function main() {
       if (s.key) idByKey[s.key] = sr.id;
       for (const src of s.sources) await db.insert(stopSources).values({ stopId: sr.id, kind: src.kind ?? "link", title: src.title, url: src.url, description: src.description ?? "" });
     }
+    if (t.slug === "savannah-squares") {
+      await db.insert(facts).values([
+        { tourId: row.id, order: 0, text: "Oglethorpe's 1733 plan had **24 squares**; 22 survive today. Each ward was built around one, with room for markets, militia drills and gatherings." },
+        { tourId: row.id, order: 1, text: "Savannah's live oaks drip with **Spanish moss**, which isn't a moss at all but a flowering plant related to pineapples." },
+        { tourId: row.id, order: 2, text: "Look up: many squares have a monument at the center, and the streets deliberately jog around them. Traffic still has to go the long way.", nearStopId: ids[0] },
+      ]);
+    }
+    if (t.slug === chicoGhostTour.slug) {
+      await db.insert(facts).values(chicoGhostFacts.map((f, i) => ({ tourId: row.id, order: i, text: f.text, nearStopId: f.near ? idByKey[f.near] : null, imageUrl: f.imageUrl ?? "", lat: f.lat ?? null, lng: f.lng ?? null, radiusM: f.radiusM ?? 60, inPool: f.inPool ?? false })));
+    }
     if (t.routes) {
-      for (const r of t.routes) await db.insert(routes).values({ tourId: row.id, name: r.name, description: r.description, stopIds: r.keys.map((k) => idByKey[k]) });
+      for (const r of t.routes) {
+        const stopIds = r.keys.map((k) => idByKey[k]);
+        // Directions are fingerprinted against the stop ids, which are new on every rebuild, so sign them here.
+        // Legs are re-derived from where each step falls along the line, so adding or moving a stop keeps them right. A stop past the end of the line (pathKeys) has no steps.
+        const stopPoints = (r.pathKeys ?? r.keys).map((k) => { const st = t.stops.find((x) => x.key === k)!; return [st.lat, st.lng] as [number, number]; });
+        const steps = assignLegs(chicoFullTourSteps.map(({ text, distanceM, at }) => ({ text, distanceM, at })), chicoFullTourPath, stopPoints);
+        const drawn = r.drawn ? { path: chicoFullTourPath, directions: { sig: routeSig(chicoFullTourPath, stopIds), steps } } : {};
+        await db.insert(routes).values({ tourId: row.id, name: r.name, description: r.description, stopIds, ...drawn });
+      }
       continue;
     }
     await db.insert(routes).values({ tourId: row.id, name: "Full tour", description: "All stops in order", stopIds: ids });

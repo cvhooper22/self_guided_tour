@@ -8,9 +8,9 @@ const ICON: Record<string, string> = { link: "🔗", image: "🖼️", document:
 export function SourcesPanel({ sources }: { sources: SourceView[] }) {
   if (!sources.length) return null;
   return (
-    <section aria-label="Primary sources and extras" className="mt-5">
-      <h3 className="mb-2 text-lg">Sources &amp; extras</h3>
-      <ul className="space-y-3">
+    <details className="t-card mt-5 p-3">
+      <summary className="cursor-pointer font-semibold">Sources &amp; extras ({sources.length})</summary>
+      <ul className="mt-3 space-y-3">
         {sources.map((s) => {
           const url = safeUrl(s.url);
           return (
@@ -24,18 +24,18 @@ export function SourcesPanel({ sources }: { sources: SourceView[] }) {
           );
         })}
       </ul>
-    </section>
+    </details>
   );
 }
 
 export function TagChips({ tags }: { tags: string[] }) {
   if (!tags.length) return null;
-  return <div className="mb-3 flex flex-wrap gap-1">{tags.map((x) => <span key={x} className="t-chip" data-testid="stop-tag">{x}</span>)}</div>;
+  return <div className="t-tags mb-3 flex flex-wrap gap-1">{tags.map((x) => <span key={x} className="t-chip" data-testid="stop-tag">{x}</span>)}</div>;
 }
 
 export function StopStory({ story }: { story: string }) {
   return (
-    <div className="space-y-3 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5">
+    <div className="t-story space-y-3 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-current/40 [&_blockquote]:pl-4 [&_blockquote]:italic">
       <Markdown>{story || "_No story yet._"}</Markdown>
     </div>
   );

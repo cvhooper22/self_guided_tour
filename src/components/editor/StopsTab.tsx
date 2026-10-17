@@ -4,14 +4,16 @@ import { TourMap } from "../MapLazy";
 import { resolveTokens } from "@/lib/themes";
 import type { TourDoc } from "@/lib/tours-repo";
 import { input } from "./styles";
+import AssetSelect from "./AssetSelect";
+import SortableList from "../SortableList";
 import MarkerPicker from "./MarkerPicker";
 import TagsField from "./TagsField";
 import type { ThemeRow } from "./ThemeTab";
 
-type Props = { doc: TourDoc; setDoc: (fn: (d: TourDoc) => TourDoc) => void; themes: ThemeRow[]; markerImages: string[] };
+type Props = { doc: TourDoc; setDoc: (fn: (d: TourDoc) => TourDoc) => void; themes: ThemeRow[]; markerImages: string[]; assetFiles: string[] };
 const KINDS = ["link", "image", "document", "audio", "video"] as const;
 
-export default function StopsTab({ doc, setDoc, themes, markerImages }: Props) {
+export default function StopsTab({ doc, setDoc, themes, markerImages, assetFiles }: Props) {
   const [sel, setSel] = useState<string | null>(doc.stops[0]?.id ?? null);
   const [placing, setPlacing] = useState(false);
   const tokens = useMemo(() => resolveTokens(themes.find((t) => t.id === doc.tour.themeId)?.tokens, doc.tour.themeOverrides), [themes, doc.tour]);
@@ -22,9 +24,6 @@ export default function StopsTab({ doc, setDoc, themes, markerImages }: Props) {
     const id = crypto.randomUUID();
     setDoc((d) => ({ ...d, stops: [...d.stops, { id, title: `Stop ${d.stops.length + 1}`, lat, lng, radiusM: 40, story: "", tags: [], markerIcon: "", markerColor: "", sources: [] }] }));
     setSel(id); setPlacing(false);
-  }
-  function move(i: number, dir: -1 | 1) {
-    setDoc((d) => { const a = [...d.stops]; const j = i + dir; if (j < 0 || j >= a.length) return d; [a[i], a[j]] = [a[j], a[i]]; return { ...d, stops: a }; });
   }
   function remove(id: string) {
     if (!confirm("Delete this stop?")) return;
@@ -42,16 +41,17 @@ export default function StopsTab({ doc, setDoc, themes, markerImages }: Props) {
         <div className={`h-[28rem] overflow-hidden rounded border ${placing ? "cursor-crosshair" : ""}`}>
           <TourMap tokens={tokens} center={[doc.stops[0]?.lat ?? doc.tour.lat, doc.stops[0]?.lng ?? doc.tour.lng]} stops={doc.stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: s.title, icon: s.markerIcon, color: s.markerColor }))} selectedId={sel} routeIds={doc.stops.map((s) => s.id)} onSelect={setSel} onMapClick={placing ? addAt : undefined} onMarkerDrag={(id, lat, lng) => patch(id, { lat: +lat.toFixed(6), lng: +lng.toFixed(6) })} fitKey="stops" />
         </div>
-        <ol className="mt-3 space-y-1">
-          {doc.stops.map((s, i) => (
-            <li key={s.id} className={`flex items-center gap-2 rounded border p-2 ${s.id === sel ? "border-black bg-black/5 dark:border-white" : ""}`}>
-              <button className="flex-1 text-left" onClick={() => setSel(s.id)}>{i + 1}. {s.title}</button>
-              <button aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
-              <button aria-label="Move down" disabled={i === doc.stops.length - 1} onClick={() => move(i, 1)}>↓</button>
-            </li>
-          ))}
-          {doc.stops.length === 0 && <li className="text-sm text-neutral-500">No stops yet. Use “Add stop on map”.</li>}
-        </ol>
+        <SortableList
+          label="stop" items={doc.stops} getId={(x) => x.id} onReorder={(stops) => setDoc((d) => ({ ...d, stops }))}
+          itemClassName={(x) => `flex items-center gap-2 rounded border p-2 ${x.id === sel ? "border-black bg-black/5 dark:border-white" : ""}`}
+          renderItem={(x, i, handle) => (
+            <>
+              {handle}
+              <button className="flex-1 text-left" onClick={() => setSel(x.id)}>{i + 1}. {x.title}</button>
+            </>
+          )}
+          footer={doc.stops.length === 0 && <li className="text-sm text-neutral-500">No stops yet. Use “Add stop on map”.</li>}
+        />
       </div>
 
       <div>
@@ -80,6 +80,7 @@ export default function StopsTab({ doc, setDoc, themes, markerImages }: Props) {
                   </div>
                   <input className={input} placeholder="Title" value={x.title} onChange={(e) => upd({ title: e.target.value })} />
                   <input className={input} placeholder="https://… link to primary source" value={x.url} onChange={(e) => upd({ url: e.target.value })} />
+                  <AssetSelect files={assetFiles} kind={x.kind as "image"} onPick={(url) => upd({ url })} />
                   <input className={input} placeholder="Short description (optional)" value={x.description} onChange={(e) => upd({ description: e.target.value })} />
                 </div>
               );

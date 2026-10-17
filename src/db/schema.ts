@@ -72,6 +72,21 @@ export const stopSources = sqliteTable("stop_sources", {
   description: text("description").notNull().default(""),
 });
 
+/** Interesting asides for in-between moments. No location = tour-wide; lat/lng = shown when the walker is near; nearStopId = shown while walking to/from that stop. */
+export const facts = sqliteTable("facts", {
+  id: id(),
+  tourId: text("tour_id").notNull().references(() => tours.id, { onDelete: "cascade" }),
+  order: integer("order").notNull().default(0),
+  text: text("text").notNull(),
+  imageUrl: text("image_url").notNull().default(""),
+  lat: real("lat"),
+  lng: real("lng"),
+  radiusM: integer("radius_m").notNull().default(60),
+  nearStopId: text("near_stop_id").references(() => stops.id, { onDelete: "set null" }),
+  // Located facts (pinned or near a stop) show in their own area; this also adds them to the tour-wide swipe-through. Facts with no location are always in it.
+  inPool: integer("in_pool", { mode: "boolean" }).notNull().default(false),
+});
+
 export const routes = sqliteTable("routes", {
   id: id(),
   tourId: text("tour_id").notNull().references(() => tours.id, { onDelete: "cascade" }),

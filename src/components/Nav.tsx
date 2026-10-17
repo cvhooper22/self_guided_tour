@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession, realAdminId } from "@/lib/auth";
 import { LogoutButton, StopViewingAs } from "./AuthButtons";
+import CompassLogo from "./CompassLogo";
 
 export default async function Nav() {
   const s = await getSession();
@@ -12,8 +13,10 @@ export default async function Nav() {
           Viewing as <b>{s.name}</b> ({s.role}) <StopViewingAs />
         </div>
       )}
-      <header className="flex h-12 items-center gap-4 border-b border-black/10 bg-white px-4 text-sm dark:bg-neutral-900 dark:text-white">
-        <Link href="/" className="font-bold">🧭 Self-Guided Tour</Link>
+      <header id="site-nav" className="site-nav flex h-12 items-center gap-5 overflow-x-auto whitespace-nowrap border-b border-black/10 bg-white px-4 text-sm dark:bg-neutral-900 dark:text-white [&>*]:shrink-0">
+        <Link href="/" className="nav-logo flex items-center" aria-label="Self-Guided Tour home">
+          <CompassLogo />
+        </Link>
         <Link href="/tours">Find a tour</Link>
         {(s?.role === "operator" || isAdmin) && <Link href="/operator">Operator</Link>}
         {isAdmin && <Link href="/admin">Admin</Link>}
@@ -24,7 +27,7 @@ export default async function Nav() {
             <LogoutButton />
           </>
         ) : (
-          <Link href="/login">Sign in</Link>
+          <Link href="/login" className="nav-action">Sign in</Link>
         )}
       </header>
     </>

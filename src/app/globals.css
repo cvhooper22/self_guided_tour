@@ -43,13 +43,13 @@ body {
 .themed .t-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
   background: var(--t-primary); color: var(--t-primary-text) !important; text-decoration: none !important;
-  border-radius: var(--t-radius); padding: .6rem 1.1rem; font-weight: 600; cursor: pointer; border: 0;
+  border-radius: var(--t-radius); --py: .6rem; padding-block: calc(var(--py) + var(--t-label-offset, 0em)) calc(var(--py) - var(--t-label-offset, 0em)); padding-inline: 1.1rem; font-weight: 600; cursor: pointer; border: 0;
 }
 .themed .t-btn-ghost {
   display: inline-flex; align-items: center; gap: .4rem; background: transparent; color: var(--t-text) !important;
-  border: var(--t-border-width) solid var(--t-border); border-radius: var(--t-radius); padding: .45rem .9rem; cursor: pointer; text-decoration: none !important;
+  border: var(--t-border-width) solid var(--t-border); border-radius: var(--t-radius); --py: .45rem; padding-block: calc(var(--py) + var(--t-label-offset, 0em)) calc(var(--py) - var(--t-label-offset, 0em)); padding-inline: .9rem; cursor: pointer; text-decoration: none !important;
 }
-.themed .t-chip { border: var(--t-border-width) solid var(--t-border); border-radius: 999px; padding: .15rem .65rem; font-size: .8em; background: var(--t-surface); }
+.themed .t-chip { border: var(--t-border-width) solid var(--t-border); border-radius: 999px; --py: .15rem; padding-block: calc(var(--py) + var(--t-label-offset, 0em)) calc(var(--py) - var(--t-label-offset, 0em)); padding-inline: .65rem; font-size: .8em; background: var(--t-surface); }
 .themed .t-accent { color: var(--t-accent); }
 .themed .t-hero { position: relative; background-size: cover; background-position: center; }
 .themed .t-hero::before { content: ""; position: absolute; inset: 0; background: var(--t-background); opacity: var(--t-hero-overlay); }
@@ -74,6 +74,13 @@ body {
 .tm-marker.circle { border-radius: 50%; }
 .tm-marker.diamond { transform: rotate(45deg); border-radius: 4px; }
 .tm-marker.diamond > span { display: block; transform: rotate(-45deg); }
+/* Art-deco stop marker: a diamond in the heading face. Unvisited = dark with a gold rule; visited = solid gold. */
+.tm-marker.deco { position: relative; isolation: isolate; width: 44px; height: 44px; padding: 0; background: none; border: 0; box-shadow: none; display: grid; place-items: center; color: var(--t-marker, #c9a24e); font: 400 16px/1 var(--t-heading-font, serif); letter-spacing: -.02em; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .55)); }
+.tm-marker.deco::before { content: ""; position: absolute; inset: 6.5px; z-index: -1; transform: rotate(45deg); background: var(--t-surface, #12343f); border: 2px solid var(--t-marker, #c9a24e); box-shadow: inset 0 0 0 2px var(--t-surface, #12343f), inset 0 0 0 3px color-mix(in srgb, var(--t-marker, #c9a24e) 55%, transparent), 0 0 0 1.5px color-mix(in srgb, var(--t-background, #000) 85%, transparent); }
+.tm-marker.deco > span { display: block; transform: none; }
+.tm-marker.deco.visited { opacity: 1; color: var(--t-primary-text, #12100e); }
+.tm-marker.deco.visited::before { background: var(--t-marker, #c9a24e); border-color: var(--t-surface, #12343f); box-shadow: inset 0 0 0 2px var(--t-marker, #c9a24e), inset 0 0 0 3px color-mix(in srgb, var(--t-surface, #12343f) 70%, transparent), 0 0 0 1.5px var(--t-marker, #c9a24e); }
+.tm-marker.deco.selected { outline: 0; transform: scale(1.12); filter: drop-shadow(0 0 2px var(--t-accent, gold)) drop-shadow(0 0 5px var(--t-accent, gold)); }
 .tm-marker-img { width: 40px; height: 40px; filter: drop-shadow(0 1px 4px rgba(0,0,0,.45)); }
 .tm-marker-img img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .tm-marker-img.visited { opacity: .55; }
@@ -86,3 +93,135 @@ body {
 .tm-vertex.last { border-color: #dc2626; }
 .tm-user { width: 16px; height: 16px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 0 0 4px rgba(37,99,235,.3); }
 .leaflet-container { font-family: inherit; }
+
+/* ---- Mobile player: keep Leaflet's attribution/controls clear of the bottom peek bar ---- */
+@media (max-width: 767px) {
+  .player-map .leaflet-bottom { bottom: calc(5.25rem + env(safe-area-inset-bottom)); }
+  .player-map .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; }
+}
+/* The player's header card sits along the top of the map; keep Leaflet's zoom buttons below it. */
+.player-map .leaflet-top { top: 4.5rem; }
+@keyframes sheet-in { from { transform: translateY(1rem); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---- Theme layer: structural switches set as data-* on the ThemeScope root (see themeAttrs in lib/themes.ts) ----
+   Skeleton classes (t-card, t-btn, t-label, t-num, t-sheet, t-stat, ...) look like the classic themes by default;
+   shape.surface / edge / frame / ornament restyle them without touching layout. */
+.themed .t-label { letter-spacing: var(--t-label-tracking, 0); text-transform: var(--t-label-transform, none); }
+/* Letter-spacing leaves a trailing gap after the last letter; centered labels cancel it so they sit on the true center. */
+.themed .t-label-c { text-indent: var(--t-label-tracking, 0); }
+.themed .t-num {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 2rem; height: 2rem;
+  border: var(--t-border-width) solid var(--t-border); border-radius: 999px; background: var(--t-surface); font-size: .85em;
+}
+.themed .t-stat { font-family: var(--t-heading-font); font-size: 1.35em; line-height: 1.1; }
+.themed .t-rule { height: 1px; background: linear-gradient(90deg, transparent, var(--t-border), transparent); }
+
+/* Ornaments: the curly flourish by default; the geometric divider when shape.ornament = "deco" */
+.themed .orn-deco { display: none; }
+[data-ornament="deco"] .orn-curl { display: none; }
+[data-ornament="deco"] .orn-deco { display: flex; }
+.themed:not([data-ornament="deco"]) .t-orn-title { display: none; }
+
+/* Glass: frosted, edge-lit panels (cards, the details sheet). Needs a busy backdrop (map, hero) to show off. */
+[data-surface="glass"].t-card, [data-surface="glass"] .t-card, [data-surface="glass"] .t-sheet {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--t-surface) 84%, transparent), color-mix(in srgb, var(--t-background) 90%, transparent));
+  -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--t-text) 55%, transparent), inset 1.5px 0 0 color-mix(in srgb, var(--t-text) 22%, transparent), 0 18px 34px -12px rgba(0, 0, 0, .6);
+}
+
+/* Double frame: a second hairline rule inset inside the border (outline, so no extra positioning is needed). */
+[data-frame="double"].t-card, [data-frame="double"] .t-card, [data-frame="double"] .t-sheet {
+  outline: 1px solid color-mix(in srgb, var(--t-border) 55%, transparent); outline-offset: -5px;
+}
+[data-frame="double"] .t-card:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+
+/* Notched edges: lozenge buttons with a rim, square ghost buttons with an inner rule, diamond number badges */
+[data-edge="notched"] .t-btn {
+  --notch: .75em;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--t-primary) 70%, white), var(--t-primary) 55%, color-mix(in srgb, var(--t-primary) 85%, black));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--t-primary) 50%, black); border-radius: 0; padding-inline: 1.6rem;
+  clip-path: polygon(var(--notch) 0, calc(100% - var(--notch)) 0, 100% 50%, calc(100% - var(--notch)) 100%, var(--notch) 100%, 0 50%);
+  text-transform: uppercase; letter-spacing: var(--t-label-tracking); font-size: .82em; font-weight: 700;
+  /* the trailing letter-space makes the text look left-heavy; take it back off the right padding */
+  padding-right: calc(1.6rem - var(--t-label-tracking)); justify-content: center;
+}
+[data-edge="notched"] .t-btn-ghost {
+  border-radius: 0; text-transform: uppercase; letter-spacing: var(--t-label-tracking); font-size: .78em; font-weight: 700;
+  padding-right: calc(.9rem - var(--t-label-tracking));
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--t-background) 55%, transparent), inset 0 0 0 4px color-mix(in srgb, var(--t-border) 50%, transparent);
+}
+[data-edge="notched"] .t-chip {
+  border-radius: 0; text-transform: uppercase; letter-spacing: var(--t-label-tracking); font-weight: 700; font-size: .72em;
+  display: inline-flex; align-items: center; gap: .5em; background: color-mix(in srgb, var(--t-background) 55%, transparent);
+  padding-right: calc(.65rem - var(--t-label-tracking));
+}
+[data-edge="notched"] .t-chip.t-chip-icon::before { display: none; }
+[data-edge="notched"] .t-chip.t-chip-icon { padding-left: .5rem; }
+[data-edge="notched"] .t-chip::before { content: ""; width: .45em; height: .45em; background: var(--t-border); transform: rotate(45deg); }
+[data-edge="notched"] .t-num { position: relative; isolation: isolate; border: 0; background: none; font-family: var(--t-heading-font); width: 2.4rem; height: 2.4rem; }
+[data-edge="notched"] .t-num::before {
+  content: ""; position: absolute; inset: .35rem; z-index: -1; transform: rotate(45deg);
+  border: var(--t-border-width) solid var(--t-border); background: var(--t-background);
+}
+[data-edge="notched"] .t-num[data-state="done"] { color: var(--t-primary-text); }
+[data-edge="notched"] .t-num[data-state="done"]::before { background: var(--t-border); }
+[data-edge="notched"] .t-num[data-state="now"] { color: var(--t-primary-text); }
+[data-edge="notched"] .t-num[data-state="now"]::before { inset: .2rem; background: var(--t-primary); }
+.themed .t-stat-sep { width: 1px; align-self: stretch; background: linear-gradient(transparent, var(--t-border), transparent); }
+[data-edge="notched"] .tm-marker.diamond { border-radius: 0; }
+
+/* Small and icon-only buttons (declared last so they win over the theme-specific padding above). */
+.themed .t-btn-ghost, .themed .t-btn { justify-content: center; }
+.themed .t-btn-sm { --py: .4rem; padding-inline: .85rem; font-size: .85em; }
+.themed .t-btn-lg { --py: .8rem; }
+[data-edge="notched"] .t-btn.t-btn-sm { --py: .5rem; padding-inline: 1.3rem calc(1.2rem - var(--t-label-tracking)); font-size: .7em; }
+[data-edge="notched"] .t-btn-ghost.t-btn-sm { --py: .4rem; padding-inline: .75rem calc(.75rem - var(--t-label-tracking)); font-size: .7em; }
+.themed .t-icon { width: 2.5rem; height: 2.5rem; padding: 0; flex-shrink: 0; }
+
+/* Native select carets sit hard against the border; draw our own inside the frame for notched themes. */
+[data-edge="notched"] select.t-card {
+  -webkit-appearance: none; appearance: none; padding-right: 2.5rem; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--t-border) 50%), linear-gradient(135deg, var(--t-border) 50%, transparent 50%);
+  background-position: calc(100% - 1.35rem) 50%, calc(100% - 1rem) 50%; background-size: .36rem .36rem; background-repeat: no-repeat;
+}
+[data-edge="notched"][data-surface="glass"] select.t-card, [data-edge="notched"][data-surface="glass"] .t-card select.t-card {
+  background-image: linear-gradient(45deg, transparent 50%, var(--t-border) 50%), linear-gradient(135deg, var(--t-border) 50%, transparent 50%),
+    linear-gradient(160deg, color-mix(in srgb, var(--t-surface) 84%, transparent), color-mix(in srgb, var(--t-background) 90%, transparent));
+  background-position: calc(100% - 1.35rem) 50%, calc(100% - 1rem) 50%, 0 0; background-size: .36rem .36rem, .36rem .36rem, auto; background-repeat: no-repeat;
+}
+
+/* Gilt quotes (shape.quote = "gilt"): a gold-tinted panel with a heavy and a hairline rule down the left edge. */
+[data-quote="gilt"] .t-story blockquote {
+  position: relative; border: 0; padding: .75rem 1rem .75rem 1.4rem; font-style: italic;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--t-border) 18%, transparent), color-mix(in srgb, var(--t-border) 2%, transparent));
+}
+[data-quote="gilt"] .t-story blockquote::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--t-border); }
+[data-quote="gilt"] .t-story blockquote::after { content: ""; position: absolute; left: 6px; top: 0; bottom: 0; width: 1px; background: var(--t-border); opacity: .6; }
+
+/* Stop title block (details sheet): size and alignment come from typography.titleSize / titleAlign. */
+.themed .t-stop-head { text-align: var(--t-title-align, left); }
+.themed .t-stop-title { font-size: min(var(--t-title-size, 1.5rem), 13vw); line-height: var(--t-title-leading, 1.33); }
+.themed .t-tags { justify-content: var(--t-title-justify, flex-start); }
+/* Deco divider: a diamond cluster flanked by rules that fade out toward the edges (see Flourish). */
+.themed .orn-rule { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--t-border)); }
+.themed .orn-rule-r { background: linear-gradient(270deg, transparent, var(--t-border)); }
+.themed .orn-gem { flex-shrink: 0; transform: rotate(45deg); background: var(--t-border); }
+.themed .orn-gem-sm { width: 7px; height: 7px; }
+.themed .orn-gem-lg { width: 11px; height: 11px; background: none; border: 1.5px solid var(--t-border); }
+
+/* ---- Site header: scrolls sideways instead of wrapping; takes on the tour theme when a page applies it (see NavTheme) ---- */
+.site-nav { scrollbar-width: none; }
+.site-nav::-webkit-scrollbar { display: none; }
+.site-nav .nav-compass { display: block; }
+#site-nav.themed {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--t-surface) 90%, var(--t-background)), var(--t-background));
+  color: var(--t-text); font-family: var(--t-body-font); font-size: .74rem; font-weight: 600;
+  letter-spacing: var(--t-label-tracking); text-transform: var(--t-label-transform);
+  border-bottom: 1.5px solid var(--t-border);
+  box-shadow: inset 0 -4px 0 var(--t-background), inset 0 -5px 0 color-mix(in srgb, var(--t-border) 50%, transparent);
+}
+#site-nav.themed a, #site-nav.themed button { color: var(--t-text); text-decoration: none; }
+#site-nav.themed .nav-logo { color: var(--t-primary); letter-spacing: 0; }
+#site-nav.themed a:hover, #site-nav.themed button:hover { color: var(--t-accent); }
+#site-nav.themed .nav-action { color: var(--t-link); }
+#site-nav.themed button { text-transform: var(--t-label-transform); letter-spacing: var(--t-label-tracking); font: inherit; }

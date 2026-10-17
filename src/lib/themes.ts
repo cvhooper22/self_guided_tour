@@ -4,7 +4,7 @@ export const THEME_SCHEMA_VERSION = 1;
 
 export const FONT_CHOICES = [
   "Inter", "Merriweather", "Playfair Display", "Lora", "Cinzel", "Creepster",
-  "Special Elite", "Mountains of Christmas", "Pacifico", "Oswald", "Roboto Slab", "Crimson Text",
+  "Special Elite", "Mountains of Christmas", "Pacifico", "Oswald", "Roboto Slab", "Crimson Text", "Limelight", "Josefin Sans",
 ] as const;
 
 /** Map looks. All but "custom" are plain OSM tiles with a CSS filter (see .tiles-* in globals.css). */
@@ -38,18 +38,36 @@ export const themeTokensSchema = z.looseObject({
     headingWeight: z.number().default(700),
     headingTransform: z.enum(["none", "uppercase", "capitalize"]).default("none"),
     headingTracking: z.number().default(0),
+    /** Small captions ("Stop 3 of 9", stats): letter-spacing in em and case. Art-deco themes use wide, uppercase labels. */
+    labelTracking: z.number().min(0).max(0.6).default(0),
+    labelTransform: z.enum(["none", "uppercase"]).default("none"),
+    /** Vertical nudge (em, positive = down) for text inside buttons and chips. Fonts whose capitals sit above their line-box center (e.g. Josefin Sans) need a small positive value. */
+    labelOffset: z.number().min(-0.4).max(0.4).default(0),
+    /** Stop title block in the details sheet: alignment (also centers the label, divider and tag chips) and size in rem. */
+    titleAlign: z.enum(["left", "center"]).default("left"),
+    titleSize: z.number().min(1).max(3.5).default(1.5),
   }).prefault({}),
   shape: z.looseObject({
     radius: z.number().min(0).max(40).default(10),
     borderWidth: z.number().min(0).max(6).default(1),
     shadow: z.enum(["none", "soft", "hard"]).default("soft"),
+    /** "glass" = frosted, blurred panels tinted by surface/background colors. */
+    surface: z.enum(["solid", "glass"]).default("solid"),
+    /** "notched" = lozenge (pointed-end) buttons and square chips/badges instead of rounded ones. */
+    edge: z.enum(["round", "notched"]).default("round"),
+    /** "double" = a thin second rule inset inside card borders. */
+    frame: z.enum(["none", "double"]).default("none"),
+    /** Which divider ornament to use between sections. */
+    ornament: z.enum(["curl", "deco"]).default("curl"),
+    /** Block quotes in stop stories: "plain" = a thin side rule; "gilt" = a tinted panel with a double gold rule down the left. */
+    quote: z.enum(["plain", "gilt"]).default("plain"),
   }).prefault({}),
   map: z.looseObject({
     tileStyle: z.enum(TILE_STYLES).default("light"),
     customTileUrl: z.string().default(""),
-    markerShape: z.enum(["pin", "circle", "diamond"]).default("pin"),
+    markerShape: z.enum(["pin", "circle", "diamond", "deco"]).default("pin"),
     markerIcon: z.string().default(""),
-    routeLineStyle: z.enum(["solid", "dashed"]).default("solid"),
+    routeLineStyle: z.enum(["solid", "dashed", "inlay"]).default("solid"),
   }).prefault({}),
   imagery: z.looseObject({
     heroOverlay: z.number().min(0).max(1).default(0.35),
@@ -118,12 +136,24 @@ export function tokensToCssVars(t: ThemeTokens): Record<string, string> {
   v["--t-heading-weight"] = String(t.typography.headingWeight);
   v["--t-heading-transform"] = t.typography.headingTransform;
   v["--t-heading-tracking"] = `${t.typography.headingTracking}em`;
+  v["--t-label-tracking"] = `${t.typography.labelTracking}em`;
+  v["--t-label-transform"] = t.typography.labelTransform;
+  v["--t-label-offset"] = `${t.typography.labelOffset}em`;
+  v["--t-title-align"] = t.typography.titleAlign;
+  v["--t-title-justify"] = t.typography.titleAlign === "center" ? "center" : "flex-start";
+  v["--t-title-size"] = `${t.typography.titleSize}rem`;
+  v["--t-title-leading"] = t.typography.titleSize >= 2 ? "1.05" : "1.33";
   v["--t-radius"] = `${t.shape.radius}px`;
   v["--t-border-width"] = `${t.shape.borderWidth}px`;
   v["--t-shadow"] = SHADOWS[t.shape.shadow];
   v["--t-hero-overlay"] = String(t.imagery.heroOverlay);
   v["--t-pattern"] = t.imagery.patternUrl ? `url("${t.imagery.patternUrl.replace(/"/g, "")}")` : "none";
   return v;
+}
+
+/** Structural theme switches, exposed as data-* attributes on the ThemeScope root (see the [data-*] rules in globals.css). */
+export function themeAttrs(t: ThemeTokens): Record<string, string> {
+  return { "data-surface": t.shape.surface, "data-edge": t.shape.edge, "data-frame": t.shape.frame, "data-ornament": t.shape.ornament, "data-quote": t.shape.quote };
 }
 
 export function tileConfig(t: ThemeTokens): { url: string; attribution: string; className: string } {
@@ -244,6 +274,30 @@ export const PRESETS: { key: string; name: string; tokens: PartialTokens }[] = [
       copy: { stopLabel: "Scene", startLabel: "Begin the case" },
     },
   },
+  {
+    key: "deco",
+    name: "Gilt & Glass",
+    tokens: {
+      colors: { background: "#0b2630", surface: "#12343f", text: "#ede3cc", mutedText: "#c4b793", primary: "#d8b15a", primaryText: "#12100e", accent: "#f3dc9a", border: "#d8b15a", link: "#f3dc9a", marker: "#d8b15a", routeLine: "#d8b15a", highlight: "#f3dc9a" },
+      typography: { headingFont: "Limelight", bodyFont: "Josefin Sans", baseSize: 17, headingWeight: 400, labelTracking: 0.28, labelTransform: "uppercase", labelOffset: 0.13, titleAlign: "center", titleSize: 3 },
+      shape: { radius: 0, borderWidth: 1.5, shadow: "soft", surface: "glass", edge: "notched", frame: "double", ornament: "deco", quote: "gilt" },
+      map: { tileStyle: "sepia", markerShape: "deco", routeLineStyle: "inlay" },
+      imagery: { heroOverlay: 0.55 },
+      copy: { stopLabel: "Stop", startLabel: "Step inside" },
+    },
+  },
+  {
+    key: "deco-night",
+    name: "Gilt & Glass Night",
+    tokens: {
+      colors: { background: "#06141b", surface: "#0b1f29", text: "#ddd3bc", mutedText: "#a99f88", primary: "#c9a24e", primaryText: "#12100e", accent: "#e8d08c", border: "#c9a24e", link: "#e8d08c", marker: "#c9a24e", routeLine: "#c9a24e", highlight: "#e8d08c" },
+      typography: { headingFont: "Limelight", bodyFont: "Josefin Sans", baseSize: 17, headingWeight: 400, labelTracking: 0.28, labelTransform: "uppercase", labelOffset: 0.13, titleAlign: "center", titleSize: 3 },
+      shape: { radius: 0, borderWidth: 1.5, shadow: "soft", surface: "glass", edge: "notched", frame: "double", ornament: "deco", quote: "gilt" },
+      map: { tileStyle: "midnight", markerShape: "deco", routeLineStyle: "inlay" },
+      imagery: { heroOverlay: 0.6 },
+      copy: { stopLabel: "Stop", startLabel: "Step inside" },
+    },
+  },
 ];
 
 /** Dropdown options for enum-like tokens, keyed by "group.key". Anything not listed is edited by value type. */
@@ -251,8 +305,15 @@ export const TOKEN_OPTIONS: Record<string, readonly string[]> = {
   "typography.headingTransform": ["none", "uppercase", "capitalize"],
   "shape.shadow": ["none", "soft", "hard"],
   "map.tileStyle": TILE_STYLES,
-  "map.markerShape": ["pin", "circle", "diamond"],
-  "map.routeLineStyle": ["solid", "dashed"],
+  "map.markerShape": ["pin", "circle", "diamond", "deco"],
+  "map.routeLineStyle": ["solid", "dashed", "inlay"],
+  "typography.labelTransform": ["none", "uppercase"],
+  "typography.titleAlign": ["left", "center"],
+  "shape.surface": ["solid", "glass"],
+  "shape.edge": ["round", "notched"],
+  "shape.frame": ["none", "double"],
+  "shape.ornament": ["curl", "deco"],
+  "shape.quote": ["plain", "gilt"],
 };
 /** Free-text tokens that get a suggestions list. */
 export const TOKEN_SUGGESTIONS: Record<string, readonly string[]> = {

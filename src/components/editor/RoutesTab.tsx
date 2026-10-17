@@ -6,6 +6,7 @@ import { routeSig } from "@/lib/directions";
 import { currentLengthM, orderStops } from "@/lib/route-order";
 import type { TourDoc } from "@/lib/tours-repo";
 import { input } from "./styles";
+import SortableList from "../SortableList";
 import type { ThemeRow } from "./ThemeTab";
 
 type Props = { doc: TourDoc; setDoc: (fn: (d: TourDoc) => TourDoc) => void; themes: ThemeRow[] };
@@ -39,16 +40,18 @@ export default function RoutesTab({ doc, setDoc, themes }: Props) {
             <button onClick={() => confirm("Delete route?") && setDoc((d) => ({ ...d, routes: d.routes.filter((x) => x.id !== r.id) }))}>✕</button>
           </div>
           <input className={input} aria-label="Route description" placeholder="Description" value={r.description} onChange={(e) => upd(r.id, { description: e.target.value })} />
-          <ol className="space-y-1">
-            {r.stopIds.map((sid, i) => (
-              <li key={`${sid}-${i}`} className="flex items-center gap-2 text-sm">
+          <SortableList
+            label="stop" className="space-y-1" items={r.stopIds} getId={(sid, i) => `${sid}#${i}`}
+            onReorder={(stopIds) => upd(r.id, { stopIds })}
+            itemClassName={() => "flex items-center gap-2 text-sm"}
+            renderItem={(sid, i, handle) => (
+              <>
+                {handle}
                 <span className="flex-1">{i + 1}. {name(sid)}</span>
-                <button aria-label="Up" disabled={i === 0} onClick={() => { const a = [...r.stopIds]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; upd(r.id, { stopIds: a }); }}>↑</button>
-                <button aria-label="Down" disabled={i === r.stopIds.length - 1} onClick={() => { const a = [...r.stopIds]; [a[i + 1], a[i]] = [a[i], a[i + 1]]; upd(r.id, { stopIds: a }); }}>↓</button>
                 <button aria-label="Remove" onClick={() => upd(r.id, { stopIds: r.stopIds.filter((_, j) => j !== i) })}>✕</button>
-              </li>
-            ))}
-          </ol>
+              </>
+            )}
+          />
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <button className="rounded border px-3 py-1.5" onClick={() => suggestOrder(r)}>Suggest shortest order</button>
             <label className="flex items-center gap-1"><input type="checkbox" checked={keepFirst} onChange={(e) => setKeepFirst(e.target.checked)} /> Keep first stop first</label>

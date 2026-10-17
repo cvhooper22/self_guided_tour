@@ -5,7 +5,7 @@ import { directionsSchema } from "./directions";
 import { markerColorSchema, markerIconSchema } from "./markers";
 import { resolveTokens, type ThemeTokens } from "./themes";
 
-const { tours, stops, stopSources, routes, themes, users } = schema;
+const { tours, stops, stopSources, routes, facts, themes, users } = schema;
 
 export type TourBundle = {
   tour: typeof tours.$inferSelect;
@@ -13,12 +13,14 @@ export type TourBundle = {
   themeName: string | null;
   stops: (typeof stops.$inferSelect & { sources: (typeof stopSources.$inferSelect)[] })[];
   routes: (typeof routes.$inferSelect)[];
+  facts: (typeof facts.$inferSelect)[];
 };
 
 async function loadBundle(tour: typeof tours.$inferSelect): Promise<TourBundle> {
-  const [stopRows, routeRows, theme] = await Promise.all([
+  const [stopRows, routeRows, factRows, theme] = await Promise.all([
     db.select().from(stops).where(eq(stops.tourId, tour.id)).orderBy(asc(stops.order)),
     db.select().from(routes).where(eq(routes.tourId, tour.id)),
+    db.select().from(facts).where(eq(facts.tourId, tour.id)).orderBy(asc(facts.order)),
     tour.themeId ? db.select().from(themes).where(eq(themes.id, tour.themeId)).then((r) => r[0]) : Promise.resolve(undefined),
   ]);
   const sources = stopRows.length
@@ -30,6 +32,7 @@ async function loadBundle(tour: typeof tours.$inferSelect): Promise<TourBundle> 
     themeName: theme?.name ?? null,
     stops: stopRows.map((s) => ({ ...s, sources: sources.filter((x) => x.stopId === s.id) })),
     routes: routeRows,
+    facts: factRows,
   };
 }
 
@@ -131,6 +134,16 @@ const sourceDoc = z.object({
 });
 const pathSchema = z.array(z.tuple([z.number().min(-90).max(90), z.number().min(-180).max(180)])).max(500).default([]);
 const tagList = z.array(z.string().trim().min(1).max(30)).max(10).transform((t) => t.filter((x, i) => t.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i));
+const factDoc = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1).max(2000),
+  imageUrl: z.string().max(2000).default(""),
+  lat: z.number().min(-90).max(90).nullable().default(null),
+  lng: z.number().min(-180).max(180).nullable().default(null),
+  radiusM: z.number().int().min(10).max(1000).default(60),
+  nearStopId: z.string().nullable().default(null),
+  inPool: z.boolean().default(false),
+});
 export const tourDocSchema = z.object({
   tour: z.object({
     title: z.string().min(1),
@@ -158,6 +171,7 @@ export const tourDocSchema = z.object({
     markerColor: markerColorSchema,
     sources: z.array(sourceDoc),
   })),
+  facts: z.array(factDoc).max(200).default([]),
   routes: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), description: z.string(), stopIds: z.array(z.string()), path: pathSchema, directions: directionsSchema })),
 });
 export type TourDoc = z.infer<typeof tourDocSchema>;
@@ -180,6 +194,15 @@ export async function saveTourDoc(tourId: string, doc: TourDoc) {
       await tx.delete(stopSources).where(eq(stopSources.stopId, s.id));
       if (s.sources.length) await tx.insert(stopSources).values(s.sources.map((x) => ({ kind: x.kind, title: x.title, url: x.url, description: x.description, stopId: s.id })));
     }
+    await tx.delete(facts).where(eq(facts.tourId, tourId));
+    if (doc.facts.length)
+      await tx.insert(facts).values(doc.facts.map((f, i) => ({
+        ...f, tourId, order: i,
+        // A fact is pinned only when it has both coordinates; a stale stop reference is dropped.
+        lat: f.lat !== null && f.lng !== null ? f.lat : null,
+        lng: f.lat !== null && f.lng !== null ? f.lng : null,
+        nearStopId: f.nearStopId && stopIds.has(f.nearStopId) ? f.nearStopId : null,
+      })));
     await tx.delete(routes).where(eq(routes.tourId, tourId));
     if (doc.routes.length)
       await tx.insert(routes).values(doc.routes.map((r) => ({ ...r, tourId, stopIds: r.stopIds.filter((id) => stopIds.has(id)) })));
