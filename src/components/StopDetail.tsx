@@ -29,6 +29,21 @@ export function SourcesPanel({ sources }: { sources: SourceView[] }) {
   );
 }
 
+/** Image sources shown under the stop title: one image at 175px, or a scroll-snap carousel at half that. */
+export function StopImages({ sources }: { sources: SourceView[] }) {
+  const imgs = sources.flatMap((s) => { const url = s.kind === "image" ? safeUrl(s.url) : null; return url ? [{ id: s.id, url, title: s.title }] : []; });
+  if (!imgs.length) return null;
+  const solo = imgs.length === 1;
+  const h = solo ? "h-[175px]" : "h-[88px]";
+  return (
+    <div className={`mb-3 flex gap-2 ${solo ? "" : "snap-x snap-mandatory overflow-x-auto pb-1"}`} data-testid="stop-images">
+      {imgs.map((i) => (
+        <ZoomImage key={i.id} src={i.url} alt={i.title} className={`${h} shrink-0 snap-start object-cover ${solo ? "w-full" : "w-auto max-w-[70%]"}`} style={{ borderRadius: "var(--t-radius)" }} />
+      ))}
+    </div>
+  );
+}
+
 export function TagChips({ tags }: { tags: string[] }) {
   if (!tags.length) return null;
   return <div className="t-tags mb-3 flex flex-wrap gap-1">{tags.map((x) => <span key={x} className="t-chip" data-testid="stop-tag">{x}</span>)}</div>;

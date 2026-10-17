@@ -1,5 +1,6 @@
 "use client";
 import Flourish from "./Flourish";
+import CompassLogo from "./CompassLogo";
 import ZoomImage from "./ZoomImage";
 import { ChevronIcon, CloseIcon, FactIcon, LocateIcon } from "./PlayerIcons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -9,7 +10,7 @@ import NavTheme from "./NavTheme";
 import { TourMap } from "./MapLazy";
 import { buildFactDeck } from "@/lib/fact-deck";
 import Markdown from "react-markdown";
-import { SourcesPanel, StopStory, TagChips } from "./StopDetail";
+import { SourcesPanel, StopImages, StopStory, TagChips } from "./StopDetail";
 import { directionsFresh, legPath } from "@/lib/directions";
 import { directionsUrls, distanceM, pathLengthM, safeUrl } from "@/lib/geo";
 import type { TourBundle } from "@/lib/tours-repo";
@@ -241,19 +242,21 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
         <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[1100] flex flex-col items-start gap-2 md:bottom-6 md:left-4 md:right-auto md:w-[24rem]" hidden={mobile && sheet}>
           {fact ? (
             <div
-              className={`t-card pointer-events-auto w-full touch-pan-y overflow-y-auto p-3 ${factWide ? "max-h-[80dvh]" : "max-h-[45dvh]"}`}
+              className={`t-card pointer-events-auto flex w-full touch-pan-y flex-col overflow-hidden p-3 ${factWide ? "max-h-[80dvh]" : "max-h-[45dvh]"}`}
               style={{ animation: "sheet-in .2s ease-out" }} role="note" aria-label="Fun fact"
               onPointerDown={(e) => { swipeX.current = e.clientX; }}
               onPointerUp={(e) => { const x = swipeX.current; swipeX.current = null; if (x !== null && Math.abs(e.clientX - x) > 50) stepFact(e.clientX < x ? 1 : -1); }}
               onPointerCancel={() => { swipeX.current = null; }}
             >
-              <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="mb-1 flex shrink-0 items-center justify-between gap-2">
                 <span className="t-chip t-chip-icon">Did you know?</span>
                 <button className="t-btn-ghost t-icon" aria-label="Close fact" onClick={() => { setFactId(null); setFactWide(false); }}><CloseIcon /></button>
               </div>
-              {factImg && <ZoomImage src={factImg} alt="" className="mb-2 max-h-48 w-full object-cover" style={{ borderRadius: "var(--t-radius)" }} />}
-              <div className="space-y-2 text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-5"><Markdown>{fact.text}</Markdown></div>
-              <div className="mt-3 flex items-center justify-between gap-2">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                {factImg && <ZoomImage src={factImg} alt="" className="mb-2 max-h-48 w-full object-cover" style={{ borderRadius: "var(--t-radius)" }} />}
+                <div className="space-y-2 text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-5"><Markdown>{fact.text}</Markdown></div>
+              </div>
+              <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
                 {deck.length > 1 ? (
                   <div className="flex items-center gap-2">
                     <button className="t-btn-ghost t-icon" aria-label="Previous fact" onClick={() => stepFact(-1)}><ChevronIcon dir="left" /></button>
@@ -323,7 +326,7 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
             onPointerCancel={() => { drag.current = null; }}
           >
             <span className="absolute left-1/2 top-2 h-1.5 w-10 -translate-x-1/2 rounded-full bg-current opacity-30" aria-hidden />
-            <button className="t-btn-ghost t-btn-sm mt-3" onClick={() => setSheet(false)}>🗺 Map ▾</button>
+            <button className="t-btn-ghost t-btn-sm mt-3 inline-flex items-center gap-1.5" aria-label="Map" onClick={() => setSheet(false)}><span aria-hidden className="inline-flex"><CompassLogo size={18} /></span> Map ▾</button>
             {stop && <span className="t-muted t-label mt-3 text-[0.65rem]">{label} {stops.indexOf(stop) + 1} of {stops.length}</span>}
           </div>
         )}
@@ -380,6 +383,7 @@ export default function Player({ slug, initialStopId }: { slug: string; initialS
               {!mobile && <p className="t-muted t-label t-label-c text-sm">{label} {stops.indexOf(stop) + 1} of {stops.length}</p>}
               <h2 className="t-stop-title mb-2">{stop.title}</h2>
               <Flourish className="t-orn-title mb-3" />
+              <StopImages sources={stop.sources} />
               <TagChips tags={stop.tags} />
             </div>
             <StopStory story={stop.story} />
