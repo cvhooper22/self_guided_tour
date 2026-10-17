@@ -38,7 +38,7 @@ export function StopImages({ sources }: { sources: SourceView[] }) {
   return (
     <div className={`mb-3 flex gap-2 ${solo ? "" : "snap-x snap-mandatory overflow-x-auto pb-1"}`} data-testid="stop-images">
       {imgs.map((i) => (
-        <ZoomImage key={i.id} src={i.url} alt={i.title} className={`${h} shrink-0 snap-start object-cover ${solo ? "w-full" : "w-auto max-w-[70%]"}`} style={{ borderRadius: "var(--t-radius)" }} />
+        <ZoomImage key={i.id} src={i.url} alt={i.title} className={`${h} w-auto max-w-full shrink-0 snap-start object-contain`} style={{ borderRadius: "var(--t-radius)" }} />
       ))}
     </div>
   );
